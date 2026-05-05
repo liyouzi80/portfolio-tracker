@@ -1,22 +1,44 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardTab } from "./dashboard-tab";
 import { TransactionsTab } from "./transactions-tab";
 import { SettingsTab } from "./settings-tab";
 import { PriceTicker } from "./price-ticker";
+import { LoginScreen } from "./login-screen";
 import { Toaster } from "@/components/ui/sonner";
 
 export function AppShell() {
   const [tab, setTab] = useState("dashboard");
+  const [unlocked, setUnlocked] = useState(false);
+
+  const handleUnlock = useCallback(() => setUnlocked(true), []);
+
+  if (!unlocked) {
+    return (
+      <>
+        <LoginScreen onUnlock={handleUnlock} />
+        <Toaster theme="dark" />
+      </>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <header className="sticky top-0 z-50 glass">
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500" />
+            <svg className="h-8 w-8" viewBox="0 0 32 32" fill="none">
+              <rect width="32" height="32" rx="8" fill="url(#logo-grad)" />
+              <path d="M10 22V12l6 8 6-8v10" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              <defs>
+                <linearGradient id="logo-grad" x1="0" y1="0" x2="32" y2="32">
+                  <stop stopColor="#34d399" />
+                  <stop offset="1" stopColor="#2dd4bf" />
+                </linearGradient>
+              </defs>
+            </svg>
             <h1 className="text-lg font-semibold tracking-tight">Portfolio</h1>
           </div>
           <Tabs value={tab} onValueChange={setTab}>

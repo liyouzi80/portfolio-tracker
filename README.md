@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Portfolio Tracker
 
-## Getting Started
+个人投资组合追踪工具，部署在 Cloudflare Workers 上。
 
-First, run the development server:
+## 功能
+
+- **持仓管理**：多账户、多市场（美股/港股/A股）、多币种
+- **交易记录**：买入/卖出/股息，CSV/Excel 批量导入
+- **实时行情**：长桥 API（主）+ Yahoo Finance（备）
+- **可视化**：净值曲线、盈亏走势、资产配置饼图
+- **价格提醒**：自定义价格阈值提醒
+- **安全登录**：Bing 每日壁纸背景 + Passkey（Touch ID/Face ID）+ 密码
+
+## 技术栈
+
+| 层 | 技术 |
+|---|---|
+| 框架 | Next.js 16（App Router + Edge Runtime） |
+| UI | shadcn/ui + Tailwind CSS v3 |
+| 图表 | Recharts |
+| 数据库 | Cloudflare D1（SQLite） |
+| 缓存 | Cloudflare KV |
+| 认证 | WebAuthn PRF + PBKDF2 + JWT |
+| 部署 | Cloudflare Workers + OpenNext |
+| CI/CD | GitHub Actions（push → 自动部署） |
+
+## 本地开发
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install --legacy-peer-deps
+npm run dev        # Next.js dev server
+npx wrangler dev   # 含 D1/KV 的完整本地环境
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 部署
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npx @opennextjs/cloudflare build
+npx wrangler deploy
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+或推送到 `master` 分支，GitHub Actions 自动构建部署。
 
-## Learn More
+## 环境变量
 
-To learn more about Next.js, take a look at the following resources:
+| 变量 | 说明 |
+|---|---|
+| `JWT_SECRET` | JWT 签名密钥 |
+| `LONGBRIDGE_APP_KEY` | 长桥 OpenAPI Key |
+| `LONGBRIDGE_APP_SECRET` | 长桥 OpenAPI Secret |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 数据结构
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `accounts` — 账户（名称、币种、杠杆率）
+- `assets` — 标的（代码、市场、类型）
+- `transactions` — 交易记录（买卖、分红）
+- `alerts` — 价格提醒
+- `exchange_rates` — 汇率
+- `auth` — 认证数据（密码哈希、Passkey PRF 哈希）
 
-## Deploy on Vercel
+## License
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT

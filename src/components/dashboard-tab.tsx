@@ -44,6 +44,7 @@ export function DashboardTab() {
 
   return (
     <div className="space-y-5">
+      {/* Row 1: Metric cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <MetricCard label="总资产" value="¥285,000" sub="≈ $39,490 USD" delay={1} />
         <MetricCard label="今日盈亏" value="+¥2,340" sub="+0.82%" accent delay={2} />
@@ -52,8 +53,19 @@ export function DashboardTab() {
         <MetricCard label="持仓数量" value="4" sub="3 个市场" delay={5} />
       </div>
 
+      {/* Row 2: Profit curve (full width) */}
+      <Card className="stagger-6 t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+        <CardHeader className="pb-0">
+          <CardTitle className="text-sm font-medium tracking-wide">盈亏走势</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ProfitCurve />
+        </CardContent>
+      </Card>
+
+      {/* Row 3: Net value + Allocation */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <Card className="stagger-6 t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+        <Card className="stagger-7 t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium tracking-wide">净值曲线</CardTitle>
           </CardHeader>
@@ -64,26 +76,6 @@ export function DashboardTab() {
 
         <Card className="stagger-7 t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium tracking-wide">盈亏走势</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ProfitCurve />
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <Card className="md:col-span-2 stagger-8 t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium tracking-wide">持仓明细</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <HoldingsTable data={mockPortfolio.holdings} />
-          </CardContent>
-        </Card>
-
-        <Card className="stagger-8 t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-          <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium tracking-wide">资产配置</CardTitle>
           </CardHeader>
           <CardContent>
@@ -91,6 +83,16 @@ export function DashboardTab() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Row 4: Holdings table */}
+      <Card className="stagger-8 t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium tracking-wide">持仓明细</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <HoldingsTable data={mockPortfolio.holdings} />
+        </CardContent>
+      </Card>
     </div>
   );
 }
