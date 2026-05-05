@@ -1,7 +1,7 @@
 name = "portfolio-tracker"
-compatibility_date = "2024-12-30"
+main = ".open-next/worker.js"
+compatibility_date = "2025-05-05"
 compatibility_flags = ["nodejs_compat"]
-pages_build_output_dir = ".open-next"
 
 [[d1_databases]]
 binding = "DB"
@@ -11,3 +11,7 @@ database_id = "8e567040-fecb-428d-b75d-e29ce0e73b31"
 [[kv_namespaces]]
 binding = "PRICE_CACHE"
 id = "86f512e06ba1486dad6ede0080ecf379"
+
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
