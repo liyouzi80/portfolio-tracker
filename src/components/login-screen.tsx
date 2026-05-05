@@ -37,48 +37,16 @@ async function getPasskeyPRF(): Promise<string> {
   return sha256(bufToB64(prfOutput));
 }
 
-async function registerPasskey(): Promise<string> {
-  const challenge = crypto.getRandomValues(new Uint8Array(32));
-  const userId = crypto.getRandomValues(new Uint8Array(16));
-  const credential = await navigator.credentials.create({
-    publicKey: {
-      challenge,
-      rp: { name: "Portfolio Tracker" },
-      user: {
-        id: userId,
-        name: "portfolio-user",
-        displayName: "Portfolio User",
-      },
-      pubKeyCredParams: [
-        { alg: -7, type: "public-key" },
-        { alg: -257, type: "public-key" },
-      ],
-      authenticatorSelection: {
-        residentKey: "required",
-        userVerification: "required",
-      },
-      timeout: 60000,
-      extensions: {
-        prf: { eval: { first: new TextEncoder().encode(PRF_SALT) } },
-      },
-    },
-  });
-  const ext = (credential as any)?.getClientExtensionResults?.() as any;
-  const prfOutput = ext?.prf?.results?.first;
-  if (!prfOutput) throw new Error("PRF registration failed");
-  return sha256(bufToB64(prfOutput));
-}
-
 export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
   const [bgUrl, setBgUrl] = useState("");
   const [bgLoaded, setBgLoaded] = useState(false);
-  const [mode, setMode] = useState<Mode>("passkey");
+  const [mode, setMode] = useState<Mode>("password");
   const [needsSetup, setNeedsSetup] = useState(false);
+  const [hasPasskey, setHasPasskey] = useState(false);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [passkeyAvailable, setPasskeyAvailable] = useState(false);
 
   // Load Bing wallpaper
   useEffect(() => {
@@ -100,12 +68,14 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
     fetch("/api/auth")
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json() as Promise<{ authenticated: boolean; needsSetup: boolean }>;
+        return r.json() as Promise<{ authenticated: boolean; needsSetup: boolean; hasPasskey?: boolean }>;
       })
       .then((d) => {
         if (d.authenticated) { onUnlock(); return; }
         setNeedsSetup(d.needsSetup);
-        if (window.PublicKeyCredential) setPasskeyAvailable(true);
+        const pk = !!d.hasPasskey && !!window.PublicKeyCredential;
+        setHasPasskey(pk);
+        if (pk) setMode("passkey");
       })
       .catch(() => {
         setError("服务器错误，请刷新重试");
@@ -163,24 +133,6 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
     setLoading(false);
   }, [onUnlock]);
 
-  const doPasskeyRegister = useCallback(async () => {
-    setLoading(true); setError("");
-    try {
-      const prfHash = await registerPasskey();
-      const res = await fetch("/api/auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "passkey-register", prfHash }),
-      });
-      const d = await res.json() as { success?: boolean; error?: string };
-      if (d.success) onUnlock();
-      else setError(d.error || "注册失败");
-    } catch (e: any) {
-      setError(e.message || "Passkey 注册失败");
-    }
-    setLoading(false);
-  }, [onUnlock]);
-
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
       {/* Bing Background */}
@@ -214,8 +166,8 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
             {needsSetup ? "设置主密码以保护数据" : "解锁以查看持仓"}
           </p>
 
-          {/* Mode Tabs */}
-          {!needsSetup && (
+          {/* Mode Tabs — only shown when passkey is already registered */}
+          {!needsSetup && hasPasskey && (
             <div className="flex rounded-xl bg-white/[0.06] p-1 mb-6 border border-white/[0.06]">
               <button
                 className={`flex-1 py-2 text-sm rounded-lg transition-colors ${mode === "passkey" ? "bg-white/10 text-white font-semibold shadow-sm" : "text-zinc-400"}`}
@@ -238,8 +190,8 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
             </div>
           )}
 
-          {/* Passkey */}
-          {mode === "passkey" && !needsSetup && (
+          {/* Passkey unlock */}
+          {mode === "passkey" && !needsSetup && hasPasskey && (
             <div className="space-y-4">
               <Button
                 className="w-full h-12 text-base bg-white/[0.08] hover:bg-white/[0.12] border border-white/[0.1] text-white"
@@ -249,15 +201,13 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
                 {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Fingerprint className="h-5 w-5 mr-2" />}
                 {loading ? "验证中..." : "使用 Passkey 解锁"}
               </Button>
-              {passkeyAvailable && (
-                <p className="text-xs text-center text-zinc-500">
-                  支持 Touch ID / Face ID / Windows Hello
-                </p>
-              )}
+              <p className="text-xs text-center text-zinc-500">
+                支持 Touch ID / Face ID / Windows Hello
+              </p>
             </div>
           )}
 
-          {/* Password */}
+          {/* Password / Setup */}
           {(mode === "password" || needsSetup) && (
             <div className="space-y-3">
               <div className="space-y-2">
@@ -289,7 +239,7 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
                 onClick={needsSetup ? doSetup : doPasswordLogin}
                 disabled={loading}
               >
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                 {needsSetup ? "创建并进入" : "解锁"}
               </Button>
             </div>
@@ -298,13 +248,6 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
           {/* Error */}
           {error && (
             <p className="text-red-400 text-sm text-center mt-4">{error}</p>
-          )}
-
-          {/* Register passkey hint */}
-          {!needsSetup && mode === "password" && passkeyAvailable && (
-            <p className="text-xs text-center text-zinc-500 mt-6">
-              登录后可注册 Passkey 快速解锁
-            </p>
           )}
 
           {/* Warning for setup */}

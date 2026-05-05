@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,8 +10,42 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AccountSheet } from "./account-sheet";
 import { AlertSheet } from "./alert-sheet";
-import { Plus, Trash2, Zap, Check, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Zap, Check, Fingerprint, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+
+const PRF_SALT = "portfolio-tracker-prf-salt-v1";
+
+function bufToB64(buf: ArrayBuffer): string {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)));
+}
+
+async function sha256(data: string): Promise<string> {
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(data));
+  return bufToB64(hash);
+}
+
+async function registerPasskey(): Promise<string> {
+  const challenge = crypto.getRandomValues(new Uint8Array(32));
+  const userId = crypto.getRandomValues(new Uint8Array(16));
+  const credential = await navigator.credentials.create({
+    publicKey: {
+      challenge,
+      rp: { name: "Portfolio Tracker" },
+      user: { id: userId, name: "portfolio-user", displayName: "Portfolio User" },
+      pubKeyCredParams: [
+        { alg: -7, type: "public-key" },
+        { alg: -257, type: "public-key" },
+      ],
+      authenticatorSelection: { residentKey: "required", userVerification: "required" },
+      timeout: 60000,
+      extensions: { prf: { eval: { first: new TextEncoder().encode(PRF_SALT) } } },
+    },
+  });
+  const ext = (credential as any)?.getClientExtensionResults?.() as any;
+  const prfOutput = ext?.prf?.results?.first;
+  if (!prfOutput) throw new Error("此设备不支持 Passkey PRF，无法注册");
+  return sha256(bufToB64(prfOutput));
+}
 
 interface Account { id: string; name: string; currency: string; leverage: number }
 interface Alert { id: string; symbol: string; condition: string; threshold: number; enabled: boolean }
@@ -24,112 +58,51 @@ export function SettingsTab() {
   const [dataSource, setDataSource] = useState("longbridge");
   const [lbKey, setLbKey] = useState("");
   const [lbSecret, setLbSecret] = useState("");
-  const [lbAccessToken, setLbAccessToken] = useState("");
   const [testing, setTesting] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [registeringPasskey, setRegisteringPasskey] = useState(false);
+  const passkeyAvailable = typeof window !== "undefined" && !!window.PublicKeyCredential;
 
-  const loadData = useCallback(async () => {
-    try {
-      const [accRes, alertRes] = await Promise.all([
-        fetch("/api/accounts"),
-        fetch("/api/alerts"),
-      ]);
-      if (!accRes.ok || !alertRes.ok) throw new Error("auth required");
-      const accData = await accRes.json() as Account[];
-      const alertData = await alertRes.json() as Array<{
-        id: string; symbol: string; conditionType: string; threshold: number; enabled: number;
-      }>;
-      setAccounts(accData);
-      setAlerts(alertData.map((a) => ({
-        id: a.id,
-        symbol: a.symbol ?? "?",
-        condition: a.conditionType,
-        threshold: a.threshold,
-        enabled: a.enabled === 1,
-      })));
-    } catch { /* ignore */ }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { loadData(); }, [loadData]);
-
-  const handleAddAccount = async (acc: { name: string; currency: string; leverage: number }) => {
-    try {
-      const res = await fetch("/api/accounts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(acc),
-      });
-      const data = await res.json() as { id?: string; error?: string };
-      if (data.id) {
-        setAccounts([...accounts, { id: data.id, ...acc }]);
-        toast.success("账户已添加");
-      } else {
-        toast.error(data.error || "添加失败");
-      }
-    } catch { toast.error("网络错误"); }
+  const handleAddAccount = (acc: { name: string; currency: string; leverage: number }) => {
+    setAccounts([...accounts, { id: Date.now().toString(36), ...acc }]);
+    toast.success("账户已添加");
   };
 
-  const handleDeleteAccount = async (id: string) => {
+  const handleDeleteAccount = (id: string) => {
+    setAccounts(accounts.filter((a) => a.id !== id));
+    toast.success("账户已删除");
+  };
+
+  const handleAddAlert = (a: { symbol: string; condition: string; threshold: number }) => {
+    setAlerts([...alerts, { id: Date.now().toString(36), ...a, enabled: true }]);
+    toast.success("提醒已创建");
+  };
+
+  const handleDeleteAlert = (id: string) => {
+    setAlerts(alerts.filter((a) => a.id !== id));
+    toast.success("提醒已删除");
+  };
+
+  const handleToggleAlert = (id: string) => {
+    setAlerts(alerts.map((a) => a.id === id ? { ...a, enabled: !a.enabled } : a));
+    toast.success("提醒状态已更新");
+  };
+
+  const handleRegisterPasskey = async () => {
+    setRegisteringPasskey(true);
     try {
-      const res = await fetch(`/api/accounts?id=${id}`, { method: "DELETE" });
+      const prfHash = await registerPasskey();
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "passkey-register", prfHash }),
+      });
       const data = await res.json() as { success?: boolean; error?: string };
-      if (data.success) {
-        setAccounts(accounts.filter((a) => a.id !== id));
-        toast.success("账户已删除");
-      } else {
-        toast.error(data.error || "删除失败");
-      }
-    } catch { toast.error("网络错误"); }
-  };
-
-  const handleAddAlert = async (a: { symbol: string; condition: string; threshold: number }) => {
-    try {
-      const res = await fetch("/api/alerts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          symbol: a.symbol,
-          market: a.symbol.match(/^\d/) ? "CN" : a.symbol.match(/^\d{4}\.HK$/i) ? "HK" : "US",
-          conditionType: a.condition,
-          threshold: a.threshold,
-        }),
-      });
-      const data = await res.json() as { id?: string; error?: string };
-      if (data.id) {
-        setAlerts([...alerts, { id: data.id, ...a, enabled: true }]);
-        toast.success("提醒已创建");
-      } else {
-        toast.error(data.error || "创建失败");
-      }
-    } catch { toast.error("网络错误"); }
-  };
-
-  const handleDeleteAlert = async (id: string) => {
-    try {
-      await fetch(`/api/alerts?id=${id}`, { method: "DELETE" });
-      setAlerts(alerts.filter((a) => a.id !== id));
-      toast.success("提醒已删除");
-    } catch { toast.error("网络错误"); }
-  };
-
-  const handleToggleAlert = async (id: string) => {
-    const alert = alerts.find((a) => a.id === id);
-    if (!alert) return;
-    const newEnabled = !alert.enabled;
-    // Optimistic update
-    setAlerts(alerts.map((a) => a.id === id ? { ...a, enabled: newEnabled } : a));
-    try {
-      await fetch(`/api/alerts/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: newEnabled ? 1 : 0 }),
-      });
-    } catch {
-      // Revert on error
-      setAlerts(alerts.map((a) => a.id === id ? { ...a, enabled: !newEnabled } : a));
-      toast.error("更新失败");
+      if (data.success) toast.success("Passkey 注册成功，下次可免密登录");
+      else toast.error(data.error || "注册失败");
+    } catch (e: any) {
+      toast.error(e.message || "Passkey 注册失败");
     }
+    setRegisteringPasskey(false);
   };
 
   const handleSaveDataSource = () => {
@@ -139,30 +112,18 @@ export function SettingsTab() {
   const handleTestConnection = async () => {
     setTesting(true);
     try {
-      const res = await fetch("/api/test-connection", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appKey: lbKey, appSecret: lbSecret, accessToken: lbAccessToken }),
-      });
-      const data = await res.json() as { success: boolean; price?: number; symbol?: string; error?: string };
-      if (data.success && data.price) {
-        toast.success(`测试成功: ${data.symbol} = $${data.price}`);
+      const res = await fetch(`/api/price?symbol=AAPL&market=US`);
+      const data = await res.json() as { price?: number | null; source?: string };
+      if (data.price) {
+        toast.success(`测试成功: AAPL = $${data.price} (${data.source})`);
       } else {
-        toast.error(data.error || "测试失败: 无法获取价格，请检查数据源配置");
+        toast.error("测试失败: 无法获取价格，请检查数据源配置");
       }
     } catch {
       toast.error("测试失败: 网络错误");
     }
     setTesting(false);
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-6 w-6 text-zinc-500 animate-spin" />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -197,6 +158,9 @@ export function SettingsTab() {
                     <TableCell className="font-mono">{a.leverage}x</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-500 hover:text-zinc-300">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-500 hover:text-red-400" onClick={() => handleDeleteAccount(a.id)}>
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -260,6 +224,39 @@ export function SettingsTab() {
         </CardContent>
       </Card>
 
+      {/* Security */}
+      <Card className="t-tab-content t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">安全设置</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-zinc-300">Passkey 快速登录</p>
+              <p className="text-xs text-zinc-500 mt-0.5">注册后可用 Touch ID / Face ID / Windows Hello 解锁</p>
+            </div>
+            {passkeyAvailable ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-zinc-700 text-zinc-300"
+                onClick={handleRegisterPasskey}
+                disabled={registeringPasskey}
+              >
+                {registeringPasskey ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                ) : (
+                  <Fingerprint className="h-3.5 w-3.5 mr-1" />
+                )}
+                {registeringPasskey ? "注册中..." : "注册 Passkey"}
+              </Button>
+            ) : (
+              <span className="text-xs text-zinc-600">此设备不支持</span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Data Source */}
       <Card className="t-tab-content t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
         <CardHeader>
@@ -284,8 +281,7 @@ export function SettingsTab() {
               <Label className="text-zinc-400 text-xs">长桥 API 参数</Label>
               <Input className="bg-zinc-900 border-zinc-700 h-9 text-sm" placeholder="App Key" type="password" value={lbKey} onChange={(e) => setLbKey(e.target.value)} />
               <Input className="bg-zinc-900 border-zinc-700 h-9 text-sm" placeholder="App Secret" type="password" value={lbSecret} onChange={(e) => setLbSecret(e.target.value)} />
-              <Input className="bg-zinc-900 border-zinc-700 h-9 text-sm" placeholder="Access Token" type="password" value={lbAccessToken} onChange={(e) => setLbAccessToken(e.target.value)} />
-              <p className="text-xs text-zinc-600">从长桥开放平台获取 App Key、App Secret 和 Access Token</p>
+              <p className="text-xs text-zinc-600">从长桥开放平台获取: open.longbridge.com</p>
             </div>
           )}
 
