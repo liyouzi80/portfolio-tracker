@@ -109,14 +109,34 @@ export async function GET(req: NextRequest) {
 
     // Fetch current prices and calculate P&L
     const holdings = Array.from(holdingsMap.values());
+
+    // First, try KV cache
+    const missingPrices: Array<{ symbol: string; market: string }> = [];
     for (const h of holdings) {
-      if (!priceCache.has(h.symbol + h.market)) {
+      const cacheKey = `price:${h.market}:${h.symbol}`;
+      try {
+        const cached = await PRICE_CACHE.get(cacheKey, "json") as { price?: number } | null;
+        if (cached?.price) { priceCache.set(h.symbol + h.market, cached.price); continue; }
+      } catch { /* ignore */ }
+      missingPrices.push(h);
+    }
+
+    // Live fetch missing prices via Tencent batch
+    if (missingPrices.length > 0) {
+      const { fetchTencentPrices } = await import("@/lib/price");
+      const livePrices = await fetchTencentPrices(missingPrices.map(h => ({ symbol: h.symbol, market: h.market })));
+      for (const [key, data] of livePrices) {
+        const [market, symbol] = key.split(":");
+        priceCache.set(symbol + market, data.price);
+        // Write back to KV cache
         try {
-          const cacheKey = `price:${h.market}:${h.symbol}`;
-          const cached = await PRICE_CACHE.get(cacheKey, "json") as { price?: number } | null;
-          if (cached?.price) priceCache.set(h.symbol + h.market, cached.price);
+          const cacheKey = `price:${market}:${symbol}`;
+          await PRICE_CACHE.put(cacheKey, JSON.stringify({ symbol, market, price: data.price, name: data.name, source: "tencent", updatedAt: Date.now() }), { expirationTtl: 900 });
         } catch { /* ignore */ }
       }
+    }
+
+    for (const h of holdings) {
       const cp = priceCache.get(h.symbol + h.market);
       if (cp && cp > 0) {
         h.currentPrice = cp;
@@ -125,7 +145,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const accountTotalCost = holdings.reduce((sum, h) => sum + h.totalCost * getRate(h.currency, acc.currency), 0);
+    const accountTotalCost = holdings.reduce((sum, h) => sum + Math.max(0, h.totalCost) * getRate(h.currency, acc.currency), 0);
     const accountMarketValue = holdings.reduce((sum, h) => {
       const price = h.currentPrice ?? h.avgCost;
       return sum + price * h.quantity * getRate(h.currency, acc.currency);
@@ -163,9 +183,10 @@ export async function GET(req: NextRequest) {
       dateMap.set(d, cur);
     }
 
-    // Fill daily from earliest date to today
+    // Fill daily from one day before earliest to today (starts from zero)
     let runningCost = 0;
     const start = new Date(earliestDate);
+    start.setDate(start.getDate() - 1); // zero point before first transaction
     const end = new Date();
     const chartPoints: ChartPoint[] = [];
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {

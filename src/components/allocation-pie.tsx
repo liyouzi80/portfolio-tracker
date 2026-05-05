@@ -25,7 +25,7 @@ export function AllocationPie({ data }: { data: AllocationItem[] }) {
           </Pie>
           <Tooltip
             contentStyle={{ background: "#18181b", border: "1px solid #27272a", borderRadius: "8px", fontSize: "13px" }}
-            formatter={(v) => [`¥${Number(v).toLocaleString()}`, ""]}
+            formatter={(v, name) => [`¥${Number(v).toLocaleString()}`, name]}
           />
         </PieChart>
       </ResponsiveContainer>
