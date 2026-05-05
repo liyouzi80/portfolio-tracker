@@ -1,21 +1,41 @@
 import { SignJWT, jwtVerify } from "jose";
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "portfolio-tracker-secret-change-me-in-production"
-);
+// Use env secret or generate a random one (changes on restart, invalidating all sessions)
+// In production, always set JWT_SECRET env var for persistent sessions
+const SECRET_KEY = process.env.JWT_SECRET
+  ? new TextEncoder().encode(process.env.JWT_SECRET)
+  : null;
+
 const COOKIE_NAME = "pt-session";
 
+function getSecretKey(): Uint8Array {
+  if (SECRET_KEY) return SECRET_KEY;
+  // Dev fallback — generates fresh key per deploy, all sessions invalidate on restart
+  // This is acceptable for a single-user personal app
+  return new TextEncoder().encode("pt-dev-" + (globalThis as any).__PT_SECRET__);
+}
+
+// Initialize dev secret once per cold start
+if (!SECRET_KEY) {
+  (globalThis as any).__PT_SECRET__ = (globalThis as any).__PT_SECRET__
+    || Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function getKey(): Uint8Array {
+  return SECRET_KEY || new TextEncoder().encode((globalThis as any).__PT_SECRET__);
+}
+
 export async function createSessionToken(): Promise<string> {
-  return new SignJWT({})
+  return new SignJWT({ jti: crypto.randomUUID() })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("30d")
-    .sign(JWT_SECRET);
+    .setExpirationTime("7d")
+    .sign(getKey());
 }
 
 export async function verifySessionToken(token: string): Promise<boolean> {
   try {
-    await jwtVerify(token, JWT_SECRET);
+    await jwtVerify(token, getKey());
     return true;
   } catch {
     return false;
@@ -23,7 +43,7 @@ export async function verifySessionToken(token: string): Promise<boolean> {
 }
 
 export function getSessionCookie(token: string): string {
-  return `${COOKIE_NAME}=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000`;
+  return `${COOKIE_NAME}=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`;
 }
 
 export function getClearCookie(): string {
@@ -37,14 +57,19 @@ export function getCookieFromRequest(request: Request): string | null {
   return match ? match[1] : null;
 }
 
-// PBKDF2 password hashing
+export async function requireAuth(request: Request): Promise<boolean> {
+  const token = getCookieFromRequest(request);
+  if (!token) return false;
+  return verifySessionToken(token);
+}
+
 export async function hashPassword(password: string, salt: Uint8Array): Promise<{ hash: string; salt: string }> {
-  const key = await crypto.subtle.importKey(
-    "raw", new TextEncoder().encode(password) as any, { name: "PBKDF2" }, false, ["deriveBits"] as any
-  );
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
   const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt: salt as any, iterations: 250000, hash: "SHA-256" },
-    key, 256
+    { name: "PBKDF2", salt, iterations: 250000, hash: "SHA-256" } as Pbkdf2Params,
+    key,
+    256
   );
   return {
     hash: btoa(String.fromCharCode(...new Uint8Array(bits))),
@@ -54,13 +79,6 @@ export async function hashPassword(password: string, salt: Uint8Array): Promise<
 
 export async function verifyPassword(password: string, storedSalt: string, storedHash: string): Promise<boolean> {
   const salt = Uint8Array.from(atob(storedSalt), (c) => c.charCodeAt(0));
-  const { hash } = await hashPassword(password, salt as any);
+  const { hash } = await hashPassword(password, salt);
   return hash === storedHash;
-}
-
-// PRF-based passkey verification
-// The client sends prfHash = SHA-256(app_salt + prfOutput)
-// Server stores this hash and compares
-export function verifyPRF(clientHash: string, storedHash: string): boolean {
-  return clientHash === storedHash;
 }

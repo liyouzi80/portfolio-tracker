@@ -82,17 +82,17 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
 
   // Load Bing wallpaper
   useEffect(() => {
+    let cancelled = false;
     fetch("/api/bg")
       .then((r) => r.json() as Promise<{ url: string }>)
       .then((d) => {
+        if (cancelled || !d.url) return;
         const img = new Image();
-        img.onload = () => {
-          setBgUrl(d.url);
-          setBgLoaded(true);
-        };
-        if (d.url) img.src = d.url;
+        img.onload = () => { if (!cancelled) { setBgUrl(d.url); setBgLoaded(true); } };
+        img.src = d.url;
       })
       .catch(() => {});
+    return () => { cancelled = true; };
   }, []);
 
   // Check auth status
@@ -221,6 +221,8 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
               <button
                 className={`flex-1 py-2 text-sm rounded-lg transition-colors ${mode === "passkey" ? "bg-white/10 text-white font-semibold shadow-sm" : "text-zinc-400"}`}
                 onClick={() => setMode("passkey")}
+                role="tab"
+                aria-selected={mode === "passkey"}
               >
                 <Fingerprint className="h-4 w-4 inline mr-1.5" />
                 Passkey
@@ -228,6 +230,8 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
               <button
                 className={`flex-1 py-2 text-sm rounded-lg transition-colors ${mode === "password" ? "bg-white/10 text-white font-semibold shadow-sm" : "text-zinc-400"}`}
                 onClick={() => setMode("password")}
+                role="tab"
+                aria-selected={mode === "password"}
               >
                 <KeyRound className="h-4 w-4 inline mr-1.5" />
                 密码

@@ -10,10 +10,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSave: (a: { symbol: string; condition: string; threshold: number }) => void;
 }
 
-export function AlertSheet({ open, onOpenChange }: Props) {
+export function AlertSheet({ open, onOpenChange, onSave }: Props) {
   const [form, setForm] = useState({ symbol: "", condition: "price_below", threshold: "" });
+
+  const handleSave = () => {
+    if (!form.symbol.trim() || !form.threshold) return;
+    onSave({ symbol: form.symbol.toUpperCase(), condition: form.condition, threshold: parseFloat(form.threshold) });
+    setForm({ symbol: "", condition: "price_below", threshold: "" });
+    onOpenChange(false);
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -29,9 +37,7 @@ export function AlertSheet({ open, onOpenChange }: Props) {
           <div className="space-y-2">
             <Label className="text-zinc-400">条件</Label>
             <Select value={form.condition} onValueChange={(v) => v && setForm({ ...form, condition: v })}>
-              <SelectTrigger className="bg-zinc-900 border-zinc-700">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="bg-zinc-900 border-zinc-700"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="price_above">价格高于</SelectItem>
                 <SelectItem value="price_below">价格低于</SelectItem>
@@ -43,7 +49,7 @@ export function AlertSheet({ open, onOpenChange }: Props) {
             <Label className="text-zinc-400">阈值</Label>
             <Input value={form.threshold} onChange={(e) => setForm({ ...form, threshold: e.target.value })} className="bg-zinc-900 border-zinc-700" type="number" />
           </div>
-          <Button className="w-full mt-4" onClick={() => onOpenChange(false)}>创建提醒</Button>
+          <Button className="w-full mt-4" onClick={handleSave}>创建提醒</Button>
         </div>
       </SheetContent>
     </Sheet>

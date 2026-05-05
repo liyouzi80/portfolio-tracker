@@ -4,30 +4,11 @@ import { getPlatformEnv } from "@/lib/env";
 import {
   createSessionToken, getSessionCookie, getClearCookie,
   getCookieFromRequest, verifySessionToken,
-  hashPassword, verifyPassword, verifyPRF,
+  hashPassword, verifyPassword,
 } from "@/lib/auth";
 
 export const runtime = "edge";
 
-const META_KEY = "auth_meta";
-
-interface AuthMeta {
-  passwordHash?: string;
-  passwordSalt?: string;
-  passkeyHash?: string;
-}
-
-async function getAuthMeta(db: ReturnType<typeof getDb>): Promise<AuthMeta | null> {
-  // Use D1 directly for simplicity
-  const result = await (db as any).run(
-    "SELECT value FROM kv_store WHERE key = ?",
-    [META_KEY]
-  );
-  // Fallback: use a simple in-memory approach
-  return null;
-}
-
-// For simplicity, store auth data in a D1 table
 async function ensureTable(db: ReturnType<typeof getDb>) {
   await (db as any).run(
     "CREATE TABLE IF NOT EXISTS auth (key TEXT PRIMARY KEY, value TEXT)"
@@ -111,7 +92,7 @@ export async function POST(req: NextRequest) {
     const storedHash = await getValue(db, "passkeyHash");
     if (!storedHash) return NextResponse.json({ error: "未注册 Passkey" }, { status: 400 });
 
-    if (!verifyPRF(body.prfHash, storedHash)) {
+    if (body.prfHash !== storedHash) {
       return NextResponse.json({ error: "Passkey 验证失败" }, { status: 401 });
     }
 
@@ -121,7 +102,9 @@ export async function POST(req: NextRequest) {
 
   // --- Logout ---
   if (body.action === "logout") {
-    return NextResponse.json({ success: true });
+    const res = NextResponse.json({ success: true });
+    res.headers.set("Set-Cookie", getClearCookie());
+    return res;
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });

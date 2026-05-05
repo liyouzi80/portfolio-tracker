@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
 
 interface Account {
   id: string;
@@ -16,16 +17,23 @@ interface Account {
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  accounts: Account[];
+  onSave: (txn: { accountId: string; symbol: string; market: string; type: string; quantity: number; price: number; fee: number; date: string }) => void;
 }
 
-const accounts: Account[] = [
-  { id: "1", name: "盈透证券", currency: "USD" },
-  { id: "2", name: "长桥", currency: "HKD" },
-  { id: "3", name: "A股", currency: "CNY" },
-];
-
-export function TransactionSheet({ open, onOpenChange }: Props) {
+export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props) {
   const [form, setForm] = useState({
+    accountId: "",
+    symbol: "",
+    market: "US" as string,
+    type: "buy" as string,
+    quantity: "",
+    price: "",
+    fee: "0",
+    date: new Date().toISOString().slice(0, 10),
+  });
+
+  const resetForm = () => setForm({
     accountId: "",
     symbol: "",
     market: "US",
@@ -38,7 +46,19 @@ export function TransactionSheet({ open, onOpenChange }: Props) {
 
   const handleSubmit = () => {
     if (!form.accountId || !form.symbol || !form.quantity || !form.price) return;
+    onSave({
+      accountId: form.accountId,
+      symbol: form.symbol.toUpperCase(),
+      market: form.market,
+      type: form.type,
+      quantity: parseFloat(form.quantity),
+      price: parseFloat(form.price),
+      fee: parseFloat(form.fee || "0"),
+      date: form.date,
+    });
+    resetForm();
     onOpenChange(false);
+    toast.success("交易已保存");
   };
 
   const isValid = form.accountId && form.symbol && form.quantity && form.price;

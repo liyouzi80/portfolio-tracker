@@ -157,14 +157,14 @@
 
 /* ---- Card hover micro-interaction ---- */
 .t-card {
-  transition: transform 0.3s var(--resize-ease),
-              box-shadow 0.3s var(--resize-ease),
-              border-color 0.3s var(--resize-ease);
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .t-card:hover {
   transform: translateY(-2px);
   border-color: hsl(240 4% 22%);
-  box-shadow: 0 8px 30px -12px rgba(0,0,0,0.4);
+  box-shadow: 0 8px 30px -12px rgba(0,0,0,0.4), 0 0 0 1px rgba(52, 211, 153, 0.08);
 }
 
 /* ---- Panel reveal (sheets) ---- */
@@ -207,4 +207,5 @@
   }
   .t-card:hover { transform: none; }
   .t-digit.is-animating { transform: none; opacity: 1; filter: none; }
+  .marquee-container { animation: none; }
 }

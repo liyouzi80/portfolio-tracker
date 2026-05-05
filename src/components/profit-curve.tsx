@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { format, subDays, startOfYear, subMonths } from "date-fns";
+import { format, subDays, startOfYear } from "date-fns";
 import { Button } from "@/components/ui/button";
 
 type Period = "1m" | "3m" | "6m" | "ytd" | "all";

@@ -10,10 +10,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSave: (acc: { name: string; currency: string; leverage: number }) => void;
 }
 
-export function AccountSheet({ open, onOpenChange }: Props) {
+export function AccountSheet({ open, onOpenChange, onSave }: Props) {
   const [form, setForm] = useState({ name: "", currency: "CNY", leverage: "1" });
+
+  const handleSave = () => {
+    if (!form.name.trim()) return;
+    onSave({ name: form.name, currency: form.currency, leverage: parseFloat(form.leverage) || 1 });
+    setForm({ name: "", currency: "CNY", leverage: "1" });
+    onOpenChange(false);
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -29,9 +37,7 @@ export function AccountSheet({ open, onOpenChange }: Props) {
           <div className="space-y-2">
             <Label className="text-zinc-400">基准币种</Label>
             <Select value={form.currency} onValueChange={(v) => v && setForm({ ...form, currency: v })}>
-              <SelectTrigger className="bg-zinc-900 border-zinc-700">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="bg-zinc-900 border-zinc-700"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="CNY">CNY (¥)</SelectItem>
                 <SelectItem value="HKD">HKD (HK$)</SelectItem>
@@ -43,7 +49,7 @@ export function AccountSheet({ open, onOpenChange }: Props) {
             <Label className="text-zinc-400">杠杆率</Label>
             <Input value={form.leverage} onChange={(e) => setForm({ ...form, leverage: e.target.value })} className="bg-zinc-900 border-zinc-700" type="number" min="1" />
           </div>
-          <Button className="w-full mt-4" onClick={() => onOpenChange(false)}>保存账户</Button>
+          <Button className="w-full mt-4" onClick={handleSave}>保存账户</Button>
         </div>
       </SheetContent>
     </Sheet>

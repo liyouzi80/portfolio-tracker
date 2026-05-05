@@ -11,15 +11,15 @@ import { TransactionSheet } from "./transaction-sheet";
 import { ImportSheet } from "./import-sheet";
 import { Plus, Upload, Search } from "lucide-react";
 
-const mockTxns = [
-  { id: "1", symbol: "AAPL", type: "buy", quantity: 50, price: 175, fee: 0, date: "2026-04-15", market: "US", currency: "USD" },
-  { id: "2", symbol: "0700", type: "buy", quantity: 200, price: 370, fee: 50, date: "2026-04-10", market: "HK", currency: "HKD" },
-  { id: "3", symbol: "600519", type: "buy", quantity: 100, price: 1780, fee: 20, date: "2026-03-28", market: "CN", currency: "CNY" },
-  { id: "4", symbol: "AAPL", type: "sell", quantity: 10, price: 185, fee: 0, date: "2026-03-20", market: "US", currency: "USD" },
+interface Txn { id: string; symbol: string; type: string; quantity: number; price: number; fee: number; date: string; market: string; currency: string }
+
+const accounts = [
+  { id: "1", name: "盈透证券", currency: "USD" },
+  { id: "2", name: "长桥", currency: "HKD" },
+  { id: "3", name: "A股", currency: "CNY" },
 ];
 
 const typeLabels: Record<string, string> = { buy: "买入", sell: "卖出", dividend: "股息" };
-
 const typeColors: Record<string, string> = {
   buy: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
   sell: "bg-red-500/10 text-red-400 border-red-500/20",
@@ -27,12 +27,23 @@ const typeColors: Record<string, string> = {
 };
 
 export function TransactionsTab() {
+  const [txns, setTxns] = useState<Txn[]>([
+    { id: "1", symbol: "AAPL", type: "buy", quantity: 50, price: 175, fee: 0, date: "2026-04-15", market: "US", currency: "USD" },
+    { id: "2", symbol: "0700", type: "buy", quantity: 200, price: 370, fee: 50, date: "2026-04-10", market: "HK", currency: "HKD" },
+    { id: "3", symbol: "600519", type: "buy", quantity: 100, price: 1780, fee: 20, date: "2026-03-28", market: "CN", currency: "CNY" },
+    { id: "4", symbol: "AAPL", type: "sell", quantity: 10, price: 185, fee: 0, date: "2026-03-20", market: "US", currency: "USD" },
+  ]);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
 
-  const filtered = mockTxns.filter((t) => {
+  const handleSaveTxn = (t: { accountId: string; symbol: string; market: string; type: string; quantity: number; price: number; fee: number; date: string }) => {
+    const acc = accounts.find((a) => a.id === t.accountId);
+    setTxns([{ id: Date.now().toString(36), ...t, currency: acc?.currency ?? "USD" }, ...txns]);
+  };
+
+  const filtered = txns.filter((t) => {
     if (search && !t.symbol.toLowerCase().includes(search.toLowerCase())) return false;
     if (typeFilter !== "all" && t.type !== typeFilter) return false;
     return true;
@@ -121,7 +132,7 @@ export function TransactionsTab() {
         </Table>
       </CardContent>
 
-      <TransactionSheet open={sheetOpen} onOpenChange={setSheetOpen} />
+      <TransactionSheet open={sheetOpen} onOpenChange={setSheetOpen} accounts={accounts} onSave={handleSaveTxn} />
       <ImportSheet open={importOpen} onOpenChange={setImportOpen} />
     </Card>
   );
