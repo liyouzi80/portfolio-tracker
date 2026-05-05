@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { getCookieFromRequest, verifySessionToken } from "@/lib/auth";
 
 // Routes that don't need authentication
-const PUBLIC_PATHS = ["/api/auth", "/api/bg", "/api/price", "/api/rates"];
+const PUBLIC_PATHS = ["/api/auth", "/api/bg", "/api/price", "/api/rates", "/api/search"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
