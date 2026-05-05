@@ -412,8 +412,10 @@ export function SettingsTab() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="longbridge">长桥 (Longbridge)</SelectItem>
-                <SelectItem value="yahoo">Yahoo Finance</SelectItem>
+                <SelectItem value="tencent">腾讯财经 (免费·默认)</SelectItem>
+                <SelectItem value="finnhub">Finnhub (免费·美股)</SelectItem>
+                <SelectItem value="longbridge">长桥 Longbridge</SelectItem>
+                <SelectItem value="yahoo">Yahoo Finance (备用)</SelectItem>
               </SelectContent>
             </Select>
           </div>

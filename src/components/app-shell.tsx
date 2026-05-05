@@ -9,12 +9,23 @@ import { Button } from "@/components/ui/button";
 import { PriceTicker } from "./price-ticker";
 import { LoginScreen } from "./login-screen";
 import { Toaster } from "@/components/ui/sonner";
-import { LogOut } from "lucide-react";
+import { LogOut, Sun, Moon } from "lucide-react";
 import { toast } from "sonner";
 
 export function AppShell() {
   const [tab, setTab] = useState("dashboard");
   const [unlocked, setUnlocked] = useState(false);
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("theme") !== "light";
+  });
+
+  const toggleTheme = useCallback(() => {
+    const next = !isDark;
+    setIsDark(next);
+    localStorage.setItem("theme", next ? "dark" : "light");
+    document.documentElement.classList.toggle("dark", next);
+  }, [isDark]);
 
   const handleUnlock = useCallback(() => setUnlocked(true), []);
 
@@ -69,6 +80,9 @@ export function AppShell() {
                   设置
                 </TabsTrigger>
               </TabsList>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-500 hover:text-zinc-300" onClick={toggleTheme}>
+                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </Button>
               <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-500 hover:text-zinc-300" onClick={handleLogout}>
                 <LogOut className="h-4 w-4" />
               </Button>

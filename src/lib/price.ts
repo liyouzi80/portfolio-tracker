@@ -11,7 +11,7 @@ function tencentSymbol(symbol: string, market: string): string {
   return symbol.toLowerCase(); // US
 }
 
-export async function fetchTencentPrice(symbol: string, market: string): Promise<{ price: number; name: string } | null> {
+export async function fetchTencentPrice(symbol: string, market: string): Promise<{ price: number; name: string; prevClose?: number } | null> {
   const qs = tencentSymbol(symbol, market);
   try {
     const res = await fetch(`http://qt.gtimg.cn/q=${qs}`, {
@@ -23,11 +23,12 @@ export async function fetchTencentPrice(symbol: string, market: string): Promise
     const match = text.match(/"([^"]*)"/);
     if (!match) return null;
     const fields = match[1].split("~");
-    // fields[0]: 0=停牌,1=正常; [1]: 名称; [3]: 最新价
+    // fields[0]: 0=停牌,1=正常; [1]: 名称; [3]: 最新价; [4]: 昨收
     if (fields[0] === "0" || !fields[3] || fields[3] === "0.000") return null;
     const price = parseFloat(fields[3]);
     if (!price || isNaN(price)) return null;
-    return { price, name: fields[1] || symbol };
+    const prevClose = parseFloat(fields[4]) || undefined;
+    return { price, name: fields[1] || symbol, prevClose };
   } catch {
     return null;
   }

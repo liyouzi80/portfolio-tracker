@@ -9,8 +9,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="zh-CN" className="dark">
-      <body className="font-sans antialiased bg-zinc-950 text-zinc-100">
+    <html lang="zh-CN" className="dark" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function(){try{var t=localStorage.getItem('theme');if(t==='light'){document.documentElement.classList.remove('dark')}}catch(e){}})()
+        `}} />
+      </head>
+      <body className="font-sans antialiased bg-background text-foreground">
         {children}
       </body>
     </html>

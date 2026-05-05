@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
 
   let price: number | null = null;
   let name: string | undefined;
+  let prevClose: number | undefined;
   let source = "none";
 
   // 1. Tencent Finance (free, reliable, multi-market)
@@ -24,6 +25,7 @@ export async function GET(req: NextRequest) {
   if (tencent) {
     price = tencent.price;
     name = tencent.name;
+    prevClose = tencent.prevClose;
     source = "tencent";
   }
 
@@ -47,9 +49,9 @@ export async function GET(req: NextRequest) {
     if (quote) { price = quote.price; name = name || quote.name; source = "yahoo"; }
   }
 
-  const data = { symbol, market, price, name, source, updatedAt: Date.now() };
+  const data = { symbol, market, price, name, source, prevClose, updatedAt: Date.now() };
   if (price !== null) {
-    await PRICE_CACHE.put(cacheKey, JSON.stringify(data), { expirationTtl: 300 });
+    await PRICE_CACHE.put(cacheKey, JSON.stringify(data), { expirationTtl: 900 }); // 15-min cache
   }
 
   return NextResponse.json(data);

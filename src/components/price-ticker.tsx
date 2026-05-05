@@ -7,6 +7,7 @@ interface TickerItem {
   symbol: string;
   price: number | null;
   change: number | null;
+  changePct: number | null;
 }
 
 export function PriceTicker() {
@@ -14,20 +15,23 @@ export function PriceTicker() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Load prices for portfolio holdings
     fetch("/api/portfolio?baseCurrency=CNY")
       .then(r => r.json() as Promise<{ holdings: Array<{ symbol: string; market: string }> }>)
       .then(d => {
         const symbols = d.holdings?.length
           ? [...new Map(d.holdings.map(h => [h.symbol, h])).values()]
-          : [{ symbol: "SPY", market: "US" }]; // fallback
+          : [{ symbol: "SPY", market: "US" }];
         return Promise.all(symbols.map(async ({ symbol, market }) => {
           try {
             const res = await fetch(`/api/price?symbol=${symbol}&market=${market}`);
-            const data = await res.json() as { price?: number | null };
-            return { symbol, price: data.price ?? null, change: null };
+            const data = await res.json() as { price?: number | null; prevClose?: number | null };
+            const price = data.price ?? null;
+            const prevClose = data.prevClose ?? null;
+            const change = (price !== null && prevClose && prevClose > 0) ? price - prevClose : null;
+            const changePct = change !== null ? (change / prevClose!) * 100 : null;
+            return { symbol, price, change, changePct };
           } catch {
-            return { symbol, price: null, change: null };
+            return { symbol: symbol, price: null, change: null, changePct: null };
           }
         }));
       })
@@ -44,11 +48,14 @@ export function PriceTicker() {
             <span className="text-zinc-300">
               {item.price !== null ? item.price.toLocaleString() : "--"}
             </span>
-            {item.change !== null && (
-              <span className={`flex items-center gap-0.5 text-xs ${item.change > 0 ? 'text-emerald-400' : item.change < 0 ? 'text-red-400' : 'text-zinc-500'}`}>
-                {item.change > 0 ? <TrendingUp className="h-3 w-3" /> : item.change < 0 ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
-                {item.change > 0 && '+'}{item.change}%
+            {item.change !== null && item.change !== 0 ? (
+              <span className={`flex items-center gap-0.5 text-xs ${item.change > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {item.change > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                {item.change > 0 ? '+' : ''}{item.change.toFixed(2)}
+                <span className="text-zinc-600">({item.changePct !== null ? (item.changePct > 0 ? '+' : '') + item.changePct.toFixed(2) + '%' : ''})</span>
               </span>
+            ) : (
+              <Minus className="h-3 w-3 text-zinc-600" />
             )}
           </div>
         ))}
