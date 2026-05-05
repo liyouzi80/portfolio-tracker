@@ -196,6 +196,58 @@
   100% { transform: translateX(-50%); }
 }
 
+/* ---- Light theme overrides ---- */
+.light body,
+body:not(.dark) {
+  --background: 0 0% 98%;
+  --foreground: 0 0% 9%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 9%;
+  --muted: 0 0% 96%;
+  --muted-foreground: 0 0% 45%;
+  --border: 0 0% 90%;
+  --input: 0 0% 90%;
+}
+
+html:not(.dark) body { background: #fafafa; color: #18181b; }
+html:not(.dark) .bg-zinc-950,
+html:not(.dark) .bg-zinc-950\/\[0\.02\] { background: #fff; }
+html:not(.dark) .bg-zinc-900,
+html:not(.dark) .bg-zinc-900\/80,
+html:not(.dark) .bg-zinc-900\/50 { background: #f4f4f5; }
+html:not(.dark) .bg-zinc-950\/\[0\.02\] { background: #fafafa; }
+html:not(.dark) .bg-zinc-800 { background: #e4e4e7; }
+html:not(.dark) .bg-white\/\[0\.02\] { background: #fafafa; }
+html:not(.dark) .bg-white\/\[0\.06\] { background: #f4f4f5; }
+html:not(.dark) .bg-white\/\[0\.08\] { background: #e4e4e7; }
+html:not(.dark) .bg-white\/10 { background: #d4d4d8; }
+html:not(.dark) .bg-black\/30,
+html:not(.dark) .bg-black\/45 { background: rgb(255 255 255 / 0.6); }
+
+html:not(.dark) .text-zinc-100 { color: #18181b; }
+html:not(.dark) .text-zinc-300 { color: #3f3f46; }
+html:not(.dark) .text-zinc-400 { color: #52525b; }
+html:not(.dark) .text-zinc-500 { color: #71717a; }
+html:not(.dark) .text-zinc-600 { color: #a1a1aa; }
+html:not(.dark) .text-white { color: #18181b; }
+
+html:not(.dark) .border-zinc-700 { border-color: #e4e4e7; }
+html:not(.dark) .border-zinc-800 { border-color: #e4e4e7; }
+html:not(.dark) .border-white\/\[0\.06\] { border-color: #e4e4e7; }
+html:not(.dark) .border-white\/\[0\.08\] { border-color: #d4d4d8; }
+html:not(.dark) .border-white\/\[0\.1\] { border-color: #d4d4d8; }
+
+html:not(.dark) .shadow-\[inset_0_1px_0_rgba\(255\,255\,255\,0\.03\)\] { box-shadow: inset 0 1px 0 rgba(0,0,0,0.04); }
+
+html:not(.dark) .glass {
+  background: hsl(0 0% 100% / 0.85);
+  backdrop-filter: blur(20px) saturate(1.2);
+  border: 1px solid #e4e4e7;
+  box-shadow: inset 0 1px 0 rgba(0,0,0,0.03);
+}
+
+html:not(.dark) .backdrop-blur-sm { backdrop-filter: blur(8px); }
+
 /* ---- Mobile responsive tables ---- */
 @media (max-width: 640px) {
   .responsive-table thead { display: none; }
