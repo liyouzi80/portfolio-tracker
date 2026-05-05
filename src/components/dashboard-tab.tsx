@@ -7,16 +7,7 @@ import { NetValueChart } from "./net-value-chart";
 import { AllocationPie } from "./allocation-pie";
 import { ProfitCurve } from "./profit-curve";
 
-const mockPortfolio = {
-  baseCurrency: "CNY",
-  totalValue: 285000,
-  holdings: [
-    { assetId: "1", symbol: "AAPL", name: "Apple Inc.", market: "US", currency: "USD", quantity: 50, avgCost: 175, totalCost: 8750 },
-    { assetId: "2", symbol: "0700", name: "腾讯控股", market: "HK", currency: "HKD", quantity: 500, avgCost: 380, totalCost: 190000 },
-    { assetId: "3", symbol: "600519", name: "贵州茅台", market: "CN", currency: "CNY", quantity: 100, avgCost: 1780, totalCost: 178000 },
-    { assetId: "4", symbol: "TSLA", name: "Tesla Inc.", market: "US", currency: "USD", quantity: 30, avgCost: 240, totalCost: 7200 },
-  ],
-};
+const emptyHoldings: any[] = [];
 
 function MetricCard({ label, value, sub, accent, delay }: { label: string; value: string; sub?: string; accent?: boolean; delay: number }) {
   return (
@@ -36,8 +27,8 @@ function MetricCard({ label, value, sub, accent, delay }: { label: string; value
 
 export function DashboardTab() {
   const totalPL = useMemo(() => {
-    const currentTotal = 312000;
-    return { value: currentTotal - mockPortfolio.totalValue, pct: ((currentTotal - mockPortfolio.totalValue) / mockPortfolio.totalValue * 100).toFixed(2) };
+    const currentTotal = 0;
+    return { value: 0, pct: "0.00" };
   }, []);
 
   const ytdValue = useMemo(() => ({ value: 48500, pct: "20.51" }), []);
@@ -64,8 +55,8 @@ export function DashboardTab() {
       </Card>
 
       {/* Row 3: Net value + Allocation */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <Card className="stagger-7 t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Card className="md:col-span-2 stagger-7 t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium tracking-wide">净值曲线</CardTitle>
           </CardHeader>
@@ -90,7 +81,7 @@ export function DashboardTab() {
           <CardTitle className="text-sm font-medium tracking-wide">持仓明细</CardTitle>
         </CardHeader>
         <CardContent>
-          <HoldingsTable data={mockPortfolio.holdings} />
+          <HoldingsTable data={emptyHoldings} />
         </CardContent>
       </Card>
     </div>

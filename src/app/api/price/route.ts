@@ -12,21 +12,36 @@ export async function GET(req: NextRequest) {
   if (!symbol) return NextResponse.json({ error: "Missing symbol" }, { status: 400 });
 
   const { PRICE_CACHE } = getPlatformEnv();
-
   const cacheKey = `price:${market}:${symbol}`;
+
+  // Return cached price if fresh
   const cached = await PRICE_CACHE.get(cacheKey, "json");
   if (cached) return NextResponse.json(cached);
 
-  // Try Longbridge first, fallback to Yahoo
-  let price;
+  // Try Longbridge first, then Yahoo as fallback
+  let price: number | null = null;
+  let source = "none";
+
   try {
     price = await fetchLongbridgePrice(symbol, market);
+    if (price !== null) source = "longbridge";
   } catch {
-    price = await fetchYahooPrice(symbol, market);
+    // Longbridge not configured or failed — try Yahoo
   }
 
-  const data = { symbol, market, price, updatedAt: Date.now() };
-  await PRICE_CACHE.put(cacheKey, JSON.stringify(data), { expirationTtl: 300 });
+  if (price === null) {
+    try {
+      price = await fetchYahooPrice(symbol, market);
+      if (price !== null) source = "yahoo";
+    } catch {
+      // Both failed
+    }
+  }
+
+  const data = { symbol, market, price, source, updatedAt: Date.now() };
+  if (price !== null) {
+    await PRICE_CACHE.put(cacheKey, JSON.stringify(data), { expirationTtl: 300 });
+  }
 
   return NextResponse.json(data);
 }

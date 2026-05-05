@@ -27,12 +27,7 @@ const typeColors: Record<string, string> = {
 };
 
 export function TransactionsTab() {
-  const [txns, setTxns] = useState<Txn[]>([
-    { id: "1", symbol: "AAPL", type: "buy", quantity: 50, price: 175, fee: 0, date: "2026-04-15", market: "US", currency: "USD" },
-    { id: "2", symbol: "0700", type: "buy", quantity: 200, price: 370, fee: 50, date: "2026-04-10", market: "HK", currency: "HKD" },
-    { id: "3", symbol: "600519", type: "buy", quantity: 100, price: 1780, fee: 20, date: "2026-03-28", market: "CN", currency: "CNY" },
-    { id: "4", symbol: "AAPL", type: "sell", quantity: 10, price: 185, fee: 0, date: "2026-03-20", market: "US", currency: "USD" },
-  ]);
+  const [txns, setTxns] = useState<Txn[]>([]);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [search, setSearch] = useState("");

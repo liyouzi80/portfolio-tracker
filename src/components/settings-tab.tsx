@@ -17,15 +17,8 @@ interface Account { id: string; name: string; currency: string; leverage: number
 interface Alert { id: string; symbol: string; condition: string; threshold: number; enabled: boolean }
 
 export function SettingsTab() {
-  const [accounts, setAccounts] = useState<Account[]>([
-    { id: "1", name: "盈透证券", currency: "USD", leverage: 1 },
-    { id: "2", name: "长桥", currency: "HKD", leverage: 1.5 },
-    { id: "3", name: "A股", currency: "CNY", leverage: 1 },
-  ]);
-  const [alerts, setAlerts] = useState<Alert[]>([
-    { id: "1", symbol: "AAPL", condition: "price_below", threshold: 160, enabled: true },
-    { id: "2", symbol: "0700", condition: "price_above", threshold: 420, enabled: false },
-  ]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [accountOpen, setAccountOpen] = useState(false);
   const [alertOpen, setAlertOpen] = useState(false);
   const [dataSource, setDataSource] = useState("longbridge");
@@ -66,9 +59,12 @@ export function SettingsTab() {
     setTesting(true);
     try {
       const res = await fetch(`/api/price?symbol=AAPL&market=US`);
-      const data = await res.json() as { price?: number };
-      if (data.price) toast.success(`测试成功: AAPL = ${data.price}`);
-      else toast.error("测试失败: 无法获取价格");
+      const data = await res.json() as { price?: number | null; source?: string };
+      if (data.price) {
+        toast.success(`测试成功: AAPL = $${data.price} (${data.source})`);
+      } else {
+        toast.error("测试失败: 无法获取价格，请检查数据源配置");
+      }
     } catch {
       toast.error("测试失败: 网络错误");
     }
