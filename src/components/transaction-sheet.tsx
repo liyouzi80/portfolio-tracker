@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowUpRight, ArrowDownRight, Wallet, Calendar, Search, Loader2 } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, Wallet, Calendar, Loader2, Check } from "lucide-react";
 
 interface Account {
   id: string;
@@ -33,20 +33,23 @@ const marketOptions = [
   { value: "CN", label: "A股", hint: "CNY" },
 ];
 
+const defaultForm = {
+  accountId: "",
+  symbol: "",
+  market: "US" as string,
+  type: "buy" as string,
+  quantity: "",
+  price: "",
+  fee: "",
+  date: new Date().toISOString().slice(0, 10),
+};
+
 export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props) {
-  const [form, setForm] = useState({
-    accountId: "",
-    symbol: "",
-    market: "US" as string,
-    type: "buy" as string,
-    quantity: "",
-    price: "",
-    fee: "",
-    date: new Date().toISOString().slice(0, 10),
-  });
+  const [form, setForm] = useState(defaultForm);
   const [symbolName, setSymbolName] = useState("");
   const [lookingUp, setLookingUp] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [addedCount, setAddedCount] = useState(0);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showSearch, setShowSearch] = useState(false);
   const lookupTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -54,31 +57,18 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
   interface SearchResult { symbol: string; fullSymbol: string; name: string; exchange: string; market: string; currency: string; marketLabel: string; price?: number | null }
 
   const resetForm = () => {
-    setForm({
-      accountId: "",
-      symbol: "",
-      market: "US",
-      type: "buy",
-      quantity: "",
-      price: "",
-      fee: "",
-      date: new Date().toISOString().slice(0, 10),
-    });
+    setForm({ ...defaultForm, accountId: form.accountId, date: form.date });
     setSymbolName("");
     setSearchResults([]);
     setShowSearch(false);
   };
 
-  // Auto-detect market from symbol format
-  function detectMarket(sym: string): string {
-    const s = sym.toUpperCase().trim();
-    if (/^\d{6}$/.test(s)) return "CN";       // 600519 → A-share
-    if (/^\d{4,5}$/.test(s)) return "HK";     // 0700, 01810 → HK
-    if (/\.HK$/i.test(s)) return "HK";
-    if (/\.SS$/i.test(s)) return "CN";
-    if (/\.SZ$/i.test(s)) return "CN";
-    return "US"; // Default: letters → US
-  }
+  const handleClose = () => {
+    setAddedCount(0);
+    setForm(defaultForm);
+    setSymbolName("");
+    onOpenChange(false);
+  };
 
   const searchSymbols = useCallback(async (query: string) => {
     if (!query || query.length < 1) { setSearchResults([]); setShowSearch(false); return; }
@@ -103,10 +93,8 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
   };
 
   const handleSymbolChange = (value: string) => {
-    // Auto-detect market from suffix or format
-    const market = detectMarket(value);
-    const clean = value.toUpperCase().replace(/\.(HK|SS|SZ)$/i, "");
-    setForm({ ...form, symbol: clean, market });
+    const clean = value.toUpperCase().replace(/\.(HK|SS|SZ|T|KS|L|DE|PA|MC|AS|MI|SW|TO|AX)$/i, "");
+    setForm({ ...form, symbol: clean });
     setSymbolName("");
     setSearchResults([]);
     if (lookupTimer.current) clearTimeout(lookupTimer.current);
@@ -117,13 +105,7 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
     }
   };
 
-  const handleMarketChange = (market: string) => {
-    setForm({ ...form, market });
-  };
-
-  const selectedAccount = accounts.find(a => a.id === form.accountId);
-
-  const handleSubmit = async () => {
+  const handleSaveAndContinue = async () => {
     if (!form.accountId || !form.symbol || !form.quantity || !form.price || submitting) return;
     setSubmitting(true);
     await onSave({
@@ -137,8 +119,8 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
       date: form.date,
     });
     setSubmitting(false);
+    setAddedCount(c => c + 1);
     resetForm();
-    onOpenChange(false);
   };
 
   const isValid = form.accountId && form.symbol && form.quantity && form.price;
@@ -151,12 +133,19 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
   const TypeIcon = selectedType?.icon ?? ArrowUpRight;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="bg-zinc-950 border-zinc-800 text-zinc-100 w-full sm:max-w-md p-0">
-        <div className="overflow-y-auto h-full px-6 py-6">
-          <SheetHeader className="mb-6">
-            <SheetTitle className="text-lg font-semibold text-zinc-100">新增交易</SheetTitle>
-          </SheetHeader>
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="bg-zinc-950 border-zinc-800 text-zinc-100 sm:max-w-lg max-h-[90vh] overflow-y-auto p-0">
+        <div className="px-6 py-6">
+          <DialogHeader className="mb-6">
+            <DialogTitle className="text-lg font-semibold text-zinc-100 flex items-center gap-2">
+              新增交易
+              {addedCount > 0 && (
+                <span className="text-xs font-normal text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full">
+                  已添加 {addedCount} 笔
+                </span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
 
           <div className="space-y-5">
             {/* Account */}
@@ -165,7 +154,9 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
               <Select value={form.accountId} onValueChange={(v) => { if (v) setForm({ ...form, accountId: v }); }}>
                 <SelectTrigger className="bg-zinc-900 border-zinc-700 h-11 text-sm">
                   <SelectValue placeholder="选择账户...">
-                    {selectedAccount ? `${selectedAccount.name} (${selectedAccount.currency})` : "选择账户..."}
+                    {accounts.find(a => a.id === form.accountId)
+                      ? `${accounts.find(a => a.id === form.accountId)!.name} (${accounts.find(a => a.id === form.accountId)!.currency})`
+                      : "选择账户..."}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -189,7 +180,7 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
                     value={form.symbol}
                     onChange={(e) => handleSymbolChange(e.target.value)}
                     className="bg-zinc-900 border-zinc-700 h-11 text-sm font-mono placeholder:text-zinc-600 pr-8"
-                    placeholder="搜索代码或名称，如 AAPL / 小米 / 0700"
+                    placeholder="搜索代码或名称"
                   />
                   {lookingUp && (
                     <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500 animate-spin" />
@@ -197,12 +188,12 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
                 </div>
                 {symbolName && !showSearch && !lookingUp && (
                   <p className="text-xs text-emerald-400/80 truncate flex items-center gap-1">
-                    <span className="text-[10px] text-emerald-500">✓</span> {symbolName}
+                    <Check className="h-3 w-3 text-emerald-500" /> {symbolName}
                   </p>
                 )}
                 {/* Search results dropdown */}
                 {showSearch && (
-                  <div className="absolute z-50 mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl max-h-64 overflow-y-auto">
+                  <div className="absolute z-50 mt-1 w-[calc(60%-0.75rem)] bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl max-h-64 overflow-y-auto">
                     {searchResults.map((r, i) => (
                       <button
                         key={i}
@@ -231,7 +222,7 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
                     <button
                       key={m.value}
                       type="button"
-                      onClick={() => handleMarketChange(m.value)}
+                      onClick={() => setForm({ ...form, market: m.value })}
                       className={`flex-1 text-xs rounded-md transition-colors ${
                         form.market === m.value
                           ? "bg-zinc-700 text-white"
@@ -333,10 +324,15 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
               </div>
             )}
 
-            {/* Submit */}
-            <Button onClick={handleSubmit} disabled={!isValid || submitting} className="w-full h-11 text-sm font-medium">
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "保存交易"}
-            </Button>
+            {/* Buttons */}
+            <div className="flex gap-2 pt-2">
+              <Button onClick={handleSaveAndContinue} disabled={!isValid || submitting} variant="outline" className="flex-1 h-11 text-sm border-zinc-700 text-zinc-300 hover:bg-zinc-800">
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "保存并继续"}
+              </Button>
+              <Button onClick={async () => { await handleSaveAndContinue(); handleClose(); }} disabled={!isValid || submitting} className="flex-1 h-11 text-sm">
+                保存并关闭
+              </Button>
+            </div>
             {!isValid && (
               <p className="text-xs text-amber-400/80 text-center">
                 请填写: {[
@@ -349,7 +345,7 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
             )}
           </div>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }

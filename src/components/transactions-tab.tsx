@@ -108,7 +108,7 @@ export function TransactionsTab() {
       });
       const data = await res.json() as { id?: string; error?: string };
       if (data.id) {
-        loadTxns();
+        // Don't reload here — let batch saves accumulate
         toast.success("交易已保存");
       } else {
         toast.error(data.error || "保存失败");
@@ -235,7 +235,7 @@ export function TransactionsTab() {
         )}
       </CardContent>
 
-      <TransactionSheet open={sheetOpen} onOpenChange={setSheetOpen} accounts={accounts} onSave={handleSaveTxn} />
+      <TransactionSheet open={sheetOpen} onOpenChange={(v) => { setSheetOpen(v); if (!v) loadTxns(); }} accounts={accounts} onSave={handleSaveTxn} />
       <ImportSheet open={importOpen} onOpenChange={setImportOpen} accounts={accounts} onDone={handleImportDone} />
     </Card>
   );
