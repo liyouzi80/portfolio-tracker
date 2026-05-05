@@ -1,12 +1,6 @@
-import { getRequestContext } from "@cloudflare/next-on-pages";
-
-declare global {
-  interface CloudflareEnv {
-    DB: D1Database;
-    PRICE_CACHE: KVNamespace;
-  }
-}
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 export function getPlatformEnv() {
-  return getRequestContext().env;
+  const { env } = getCloudflareContext();
+  return env as { DB: D1Database; PRICE_CACHE: KVNamespace };
 }

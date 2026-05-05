@@ -1,7 +1,7 @@
 name = "portfolio-tracker"
 compatibility_date = "2024-12-30"
 compatibility_flags = ["nodejs_compat"]
-pages_build_output_dir = ".vercel/output/static"
+pages_build_output_dir = ".open-next"
 
 [[d1_databases]]
 binding = "DB"
