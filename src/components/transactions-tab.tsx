@@ -12,7 +12,7 @@ import { ImportSheet } from "./import-sheet";
 import { Plus, Upload, Search, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-interface Txn { id: string; symbol: string; type: string; quantity: number; price: number; fee: number; date: string; market: string; currency: string }
+interface Txn { id: string; symbol: string; type: string; quantity: number; price: number; fee: number; date: string; market: string; currency: string; accountName: string }
 interface Account { id: string; name: string; currency: string }
 
 const typeLabels: Record<string, string> = { buy: "买入", sell: "卖出", dividend: "股息" };
@@ -39,6 +39,7 @@ export function TransactionsTab() {
       const data = await res.json() as Array<{
         transactions: { id: string; type: string; quantity: number; price: number; fee: number; date: string };
         assets: { symbol: string; market: string; currency: string } | null;
+        accounts: { name: string } | null;
       }>;
       const mapped: Txn[] = data.map((row) => ({
         id: row.transactions.id,
@@ -50,6 +51,7 @@ export function TransactionsTab() {
         date: row.transactions.date,
         market: row.assets?.market ?? "US",
         currency: row.assets?.currency ?? "USD",
+        accountName: row.accounts?.name ?? "?",
       }));
       setTxns(mapped);
     } catch {
@@ -168,6 +170,7 @@ export function TransactionsTab() {
             <TableHeader>
               <TableRow className="border-zinc-800 hover:bg-transparent">
                 <TableHead className="text-zinc-500">日期</TableHead>
+                <TableHead className="text-zinc-500">账户</TableHead>
                 <TableHead className="text-zinc-500">代码</TableHead>
                 <TableHead className="text-zinc-500">类型</TableHead>
                 <TableHead className="text-zinc-500 text-right">数量</TableHead>
@@ -181,6 +184,7 @@ export function TransactionsTab() {
               {filtered.map((t) => (
                 <TableRow key={t.id} className="border-zinc-800">
                   <TableCell className="text-zinc-300">{t.date}</TableCell>
+                  <TableCell className="text-zinc-400 text-sm">{t.accountName}</TableCell>
                   <TableCell className="font-mono font-medium">{t.symbol}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className={typeColors[t.type] ?? "border-zinc-700"}>
@@ -212,7 +216,7 @@ export function TransactionsTab() {
               ))}
               {filtered.length === 0 && !loading && (
                 <TableRow className="border-zinc-800">
-                  <TableCell colSpan={8} className="text-center text-zinc-500 py-8">
+                  <TableCell colSpan={9} className="text-center text-zinc-500 py-8">
                     暂无交易记录
                   </TableCell>
                 </TableRow>

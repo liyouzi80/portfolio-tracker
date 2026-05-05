@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db";
-import { transactions, assets } from "@/db/schema";
+import { transactions, assets, accounts } from "@/db/schema";
 import { cuid } from "@/lib/cuid";
 import { getPlatformEnv } from "@/lib/env";
 import { eq, desc, and } from "drizzle-orm";
@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
     .select()
     .from(transactions)
     .leftJoin(assets, eq(transactions.assetId, assets.id))
+    .leftJoin(accounts, eq(transactions.accountId, accounts.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(transactions.date))
     .limit(limit)

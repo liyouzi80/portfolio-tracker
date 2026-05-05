@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPlatformEnv } from "@/lib/env";
-import { fetchYahooPrice, fetchLongbridgePrice } from "@/lib/price";
-
+import { fetchYahooPrice, fetchYahooQuote, fetchLongbridgePrice } from "@/lib/price";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -13,31 +12,24 @@ export async function GET(req: NextRequest) {
   const { PRICE_CACHE } = getPlatformEnv();
   const cacheKey = `price:${market}:${symbol}`;
 
-  // Return cached price if fresh
   const cached = await PRICE_CACHE.get(cacheKey, "json");
   if (cached) return NextResponse.json(cached);
 
-  // Try Longbridge first (env vars injected as Worker secrets), then Yahoo as fallback
   let price: number | null = null;
+  let name: string | undefined;
   let source = "none";
 
   try {
     price = await fetchLongbridgePrice(symbol, market);
     if (price !== null) source = "longbridge";
-  } catch {
-    // Longbridge not configured or failed — try Yahoo
-  }
+  } catch { /* fallback */ }
 
   if (price === null) {
-    try {
-      price = await fetchYahooPrice(symbol, market);
-      if (price !== null) source = "yahoo";
-    } catch {
-      // Both failed
-    }
+    const quote = await fetchYahooQuote(symbol, market);
+    if (quote) { price = quote.price; name = quote.name; source = "yahoo"; }
   }
 
-  const data = { symbol, market, price, source, updatedAt: Date.now() };
+  const data = { symbol, market, price, name, source, updatedAt: Date.now() };
   if (price !== null) {
     await PRICE_CACHE.put(cacheKey, JSON.stringify(data), { expirationTtl: 300 });
   }

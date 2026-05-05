@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowUpRight, ArrowDownRight, Wallet, Calendar } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, Wallet, Calendar, Search, Loader2 } from "lucide-react";
 
 interface Account {
   id: string;
@@ -44,17 +44,47 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
     fee: "",
     date: new Date().toISOString().slice(0, 10),
   });
+  const [symbolName, setSymbolName] = useState("");
+  const [lookingUp, setLookingUp] = useState(false);
+  const lookupTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const resetForm = () => setForm({
-    accountId: "",
-    symbol: "",
-    market: "US",
-    type: "buy",
-    quantity: "",
-    price: "",
-    fee: "",
-    date: new Date().toISOString().slice(0, 10),
-  });
+  const resetForm = () => {
+    setForm({
+      accountId: "",
+      symbol: "",
+      market: "US",
+      type: "buy",
+      quantity: "",
+      price: "",
+      fee: "",
+      date: new Date().toISOString().slice(0, 10),
+    });
+    setSymbolName("");
+  };
+
+  const lookupSymbol = useCallback(async (symbol: string, market: string) => {
+    if (!symbol || symbol.length < 1) { setSymbolName(""); return; }
+    setLookingUp(true);
+    try {
+      const res = await fetch(`/api/price?symbol=${symbol.toUpperCase()}&market=${market}`);
+      const data = await res.json() as { name?: string; price?: number | null };
+      setSymbolName(data.name ?? "");
+    } catch { setSymbolName(""); }
+    setLookingUp(false);
+  }, []);
+
+  const handleSymbolChange = (value: string) => {
+    setForm({ ...form, symbol: value });
+    if (lookupTimer.current) clearTimeout(lookupTimer.current);
+    lookupTimer.current = setTimeout(() => lookupSymbol(value, form.market), 400);
+  };
+
+  const handleMarketChange = (market: string) => {
+    setForm({ ...form, market });
+    if (form.symbol) lookupSymbol(form.symbol, market);
+  };
+
+  const selectedAccount = accounts.find(a => a.id === form.accountId);
 
   const handleSubmit = () => {
     if (!form.accountId || !form.symbol || !form.quantity || !form.price) return;
@@ -93,19 +123,18 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
             {/* Account */}
             <div className="space-y-2">
               <Label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">账户</Label>
-              <Select value={form.accountId} onValueChange={(v) => v && setForm({ ...form, accountId: v })}>
+              <Select value={form.accountId} onValueChange={(v) => { if (v) setForm({ ...form, accountId: v }); }}>
                 <SelectTrigger className="bg-zinc-900 border-zinc-700 h-11 text-sm">
-                  <SelectValue placeholder="选择账户..." />
+                  <SelectValue placeholder="选择账户...">
+                    {selectedAccount ? `${selectedAccount.name} (${selectedAccount.currency})` : "选择账户..."}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {accounts.length === 0 ? (
                     <div className="px-2 py-4 text-sm text-zinc-500 text-center">暂无账户，请先在设置中添加</div>
                   ) : (
                     accounts.map((a) => (
-                      <SelectItem key={a.id} value={a.id}>
-                        <span className="font-medium">{a.name}</span>
-                        <span className="ml-2 text-xs text-zinc-500">{a.currency}</span>
-                      </SelectItem>
+                      <SelectItem key={a.id} value={a.id}>{a.name} ({a.currency})</SelectItem>
                     ))
                   )}
                 </SelectContent>
@@ -116,12 +145,20 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
             <div className="grid grid-cols-5 gap-3">
               <div className="col-span-3 space-y-2">
                 <Label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">代码</Label>
-                <Input
-                  value={form.symbol}
-                  onChange={(e) => setForm({ ...form, symbol: e.target.value })}
-                  className="bg-zinc-900 border-zinc-700 h-11 text-sm font-mono uppercase placeholder:text-zinc-600"
-                  placeholder="AAPL"
-                />
+                <div className="relative">
+                  <Input
+                    value={form.symbol}
+                    onChange={(e) => handleSymbolChange(e.target.value)}
+                    className="bg-zinc-900 border-zinc-700 h-11 text-sm font-mono uppercase placeholder:text-zinc-600 pr-8"
+                    placeholder="AAPL"
+                  />
+                  {lookingUp && (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500 animate-spin" />
+                  )}
+                </div>
+                {symbolName && (
+                  <p className="text-xs text-emerald-400/80 truncate">{symbolName}</p>
+                )}
               </div>
               <div className="col-span-2 space-y-2">
                 <Label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">市场</Label>
@@ -130,7 +167,7 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
                     <button
                       key={m.value}
                       type="button"
-                      onClick={() => setForm({ ...form, market: m.value })}
+                      onClick={() => handleMarketChange(m.value)}
                       className={`flex-1 text-xs rounded-md transition-colors ${
                         form.market === m.value
                           ? "bg-zinc-700 text-white"

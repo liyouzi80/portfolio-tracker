@@ -12,6 +12,11 @@ function cnSuffix(symbol: string): string {
 }
 
 export async function fetchYahooPrice(symbol: string, market: string): Promise<number | null> {
+  const q = await fetchYahooQuote(symbol, market);
+  return q?.price ?? null;
+}
+
+export async function fetchYahooQuote(symbol: string, market: string): Promise<{ price: number; name?: string } | null> {
   const suffix = market === "CN" ? cnSuffix(symbol) : market === "HK" ? ".HK" : "";
   const yahooSymbol = symbol + suffix;
 
@@ -24,8 +29,10 @@ export async function fetchYahooPrice(symbol: string, market: string): Promise<n
       },
     });
     if (!res.ok) return null;
-    const data = await res.json() as { chart: { result?: [{ meta?: { regularMarketPrice?: number } }] } };
-    return data.chart?.result?.[0]?.meta?.regularMarketPrice ?? null;
+    const data = await res.json() as { chart: { result?: [{ meta?: { regularMarketPrice?: number; shortName?: string; longName?: string } }] } };
+    const meta = data.chart?.result?.[0]?.meta;
+    if (!meta?.regularMarketPrice) return null;
+    return { price: meta.regularMarketPrice, name: meta.shortName || meta.longName };
   } catch {
     return null;
   }
