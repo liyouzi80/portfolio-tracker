@@ -106,21 +106,10 @@ export function SettingsTab() {
   const handleTestConnection = async () => {
     setTesting(true);
     try {
-      if (dataSource === "longbridge" && lbKey && lbSecret && lbAccessToken) {
-        const res = await fetch("/api/test-connection", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ appKey: lbKey, appSecret: lbSecret, accessToken: lbAccessToken }),
-        });
-        const data = await res.json() as { success: boolean; price?: number; symbol?: string; error?: string };
-        if (data.success && data.price) toast.success(`测试成功: ${data.symbol} = $${data.price}`);
-        else toast.error(data.error || "测试失败");
-      } else {
-        const res = await fetch("/api/price?symbol=AAPL&market=US");
-        const data = await res.json() as { price?: number | null; source?: string };
-        if (data.price) toast.success(`测试成功: AAPL = $${data.price} (${data.source})`);
-        else toast.error("测试失败: 无法获取价格");
-      }
+      const res = await fetch("/api/test-connection", { method: "POST" });
+      const data = await res.json() as { success: boolean; price?: number; symbol?: string; error?: string };
+      if (data.success && data.price) toast.success(`测试成功: ${data.symbol} = $${data.price}`);
+      else toast.error(data.error || "测试失败");
     } catch {
       toast.error("测试失败: 网络错误");
     }

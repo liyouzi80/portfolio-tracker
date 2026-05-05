@@ -4,18 +4,11 @@ import { fetchLongbridgePrice } from "@/lib/price";
 export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
-  const body = await req.json() as { appKey?: string; appSecret?: string; accessToken?: string };
+  const body = await req.json().catch(() => ({})) as { appKey?: string; appSecret?: string; accessToken?: string };
   const { appKey, appSecret, accessToken } = body;
 
-  if (!appKey || !appSecret || !accessToken) {
-    return NextResponse.json({
-      success: false,
-      error: "请提供 App Key、App Secret 和 Access Token",
-    }, { status: 400 });
-  }
-
   try {
-    const price = await fetchLongbridgePrice("AAPL", "US", { appKey, appSecret, accessToken });
+    const price = await fetchLongbridgePrice("AAPL", "US", appKey ? { appKey, appSecret: appSecret!, accessToken: accessToken! } : undefined);
     if (price !== null) {
       return NextResponse.json({ success: true, price, symbol: "AAPL.US" });
     }
