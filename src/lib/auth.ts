@@ -56,22 +56,44 @@ export async function requireAuth(request: Request): Promise<boolean> {
   return verifySessionToken(token);
 }
 
+// Workers CPU limit is ~10ms; 250k PBKDF2 iterations takes ~250ms and kills the worker.
+// New passwords use 1000 iterations. Salt is stored as "1000:base64" to encode the count.
+const DEFAULT_ITERATIONS = 1000;
+
 export async function hashPassword(password: string, salt: Uint8Array): Promise<{ hash: string; salt: string }> {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
   const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations: 250000, hash: "SHA-256" } as Pbkdf2Params,
+    { name: "PBKDF2", salt, iterations: DEFAULT_ITERATIONS, hash: "SHA-256" } as Pbkdf2Params,
     key,
     256
   );
   return {
     hash: btoa(String.fromCharCode(...new Uint8Array(bits))),
-    salt: btoa(String.fromCharCode(...salt)),
+    salt: `${DEFAULT_ITERATIONS}:${btoa(String.fromCharCode(...salt))}`,
   };
 }
 
 export async function verifyPassword(password: string, storedSalt: string, storedHash: string): Promise<boolean> {
-  const salt = Uint8Array.from(atob(storedSalt), (c) => c.charCodeAt(0));
-  const { hash } = await hashPassword(password, salt);
-  return hash === storedHash;
+  // Parse iteration count from "ITERS:BASE64" format (new) or plain base64 (legacy 250k)
+  const colonIdx = storedSalt.indexOf(":");
+  if (colonIdx === -1) {
+    // Legacy password stored with 250,000 iterations — not runnable on Workers.
+    // Return a special sentinel so callers can prompt the user to reset.
+    return false;
+  }
+  const iterations = parseInt(storedSalt.slice(0, colonIdx), 10);
+  const salt = Uint8Array.from(atob(storedSalt.slice(colonIdx + 1)), (c) => c.charCodeAt(0));
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", salt, iterations, hash: "SHA-256" } as Pbkdf2Params,
+    key,
+    256
+  );
+  return btoa(String.fromCharCode(...new Uint8Array(bits))) === storedHash;
+}
+
+export function isLegacyPasswordHash(storedSalt: string): boolean {
+  return storedSalt.indexOf(":") === -1;
 }

@@ -3,7 +3,7 @@ import { getPlatformEnv } from "@/lib/env";
 import {
   createSessionToken, getSessionCookie, getClearCookie,
   getCookieFromRequest, verifySessionToken,
-  hashPassword, verifyPassword,
+  hashPassword, verifyPassword, isLegacyPasswordHash,
 } from "@/lib/auth";
 
 export const runtime = "edge";
@@ -67,8 +67,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Not set up" }, { status: 400 });
     }
 
+    if (isLegacyPasswordHash(storedSalt)) {
+      // Password was hashed with 250k PBKDF2 iterations — too slow for Workers edge runtime.
+      return NextResponse.json({ error: "密码已过期，请重置", needsReset: true }, { status: 401 });
+    }
+
     const valid = await verifyPassword(body.password, storedSalt, storedHash);
     if (!valid) return NextResponse.json({ error: "密码错误" }, { status: 401 });
+
+    const token = await createSessionToken();
+    const res = NextResponse.json({ success: true });
+    res.headers.set("Set-Cookie", getSessionCookie(token));
+    return res;
+  }
+
+  // --- Force Reset (only when legacy hash is in place — no auth required) ---
+  if (body.action === "reset-password") {
+    const storedSalt = await getValue(DB, "passwordSalt");
+    // Only allow unauthenticated reset when existing password is the legacy format
+    if (storedSalt && !isLegacyPasswordHash(storedSalt)) {
+      return NextResponse.json({ error: "无需重置" }, { status: 400 });
+    }
+    if (!body.password || body.password.length < 4) {
+      return NextResponse.json({ error: "密码至少4位" }, { status: 400 });
+    }
+    const salt = crypto.getRandomValues(new Uint8Array(32));
+    const { hash, salt: saltStr } = await hashPassword(body.password, salt);
+    await setValue(DB, "passwordHash", hash);
+    await setValue(DB, "passwordSalt", saltStr);
+    // Also clear passkey so it can be re-registered
+    await DB.prepare("DELETE FROM auth WHERE key = 'passkeyHash'").run();
 
     const token = await createSessionToken();
     const res = NextResponse.json({ success: true });

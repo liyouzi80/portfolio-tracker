@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Fingerprint, KeyRound, Loader2 } from "lucide-react";
 
-type Mode = "passkey" | "password" | "setup";
+type Mode = "passkey" | "password" | "setup" | "reset";
 
 const PRF_SALT = "portfolio-tracker-prf-salt-v1";
 
@@ -108,12 +108,31 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "login-password", password }),
       });
-      const d = await res.json() as { success?: boolean; error?: string };
+      const d = await res.json() as { success?: boolean; error?: string; needsReset?: boolean };
       if (d.success) onUnlock();
+      else if (d.needsReset) { setMode("reset"); setPassword(""); setConfirm(""); setError(""); }
       else setError(d.error || "密码错误");
     } catch { setError("网络错误"); }
     setLoading(false);
   }, [password, onUnlock]);
+
+  const doReset = useCallback(async () => {
+    if (password !== confirm || password.length < 4) {
+      setError("密码至少4位且两次输入一致"); return;
+    }
+    setLoading(true); setError("");
+    try {
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reset-password", password }),
+      });
+      const d = await res.json() as { success?: boolean; error?: string };
+      if (d.success) onUnlock();
+      else setError(d.error || "重置失败");
+    } catch { setError("网络错误"); }
+    setLoading(false);
+  }, [password, confirm, onUnlock]);
 
   const doPasskeyLogin = useCallback(async () => {
     setLoading(true); setError("");
@@ -160,10 +179,10 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
           </div>
 
           <h2 className="text-xl font-semibold text-center text-white mb-1 tracking-tight">
-            {needsSetup ? "初始设置" : "Portfolio"}
+            {needsSetup ? "初始设置" : mode === "reset" ? "重置密码" : "Portfolio"}
           </h2>
           <p className="text-sm text-center text-zinc-400 mb-6">
-            {needsSetup ? "设置主密码以保护数据" : "解锁以查看持仓"}
+            {needsSetup ? "设置主密码以保护数据" : mode === "reset" ? "设置新密码以继续" : "解锁以查看持仓"}
           </p>
 
           {/* Mode Tabs — only shown when passkey is already registered */}
@@ -242,6 +261,41 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
                 {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                 {needsSetup ? "创建并进入" : "解锁"}
               </Button>
+            </div>
+          )}
+
+          {/* Reset password (triggered when server returns needsReset) */}
+          {mode === "reset" && (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label className="text-zinc-400 text-xs">新密码</Label>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="bg-white/[0.06] border-white/[0.08] h-11 text-white placeholder:text-zinc-600"
+                  placeholder="设置新密码"
+                  onKeyDown={(e) => e.key === "Enter" && doReset()}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-zinc-400 text-xs">确认新密码</Label>
+                <Input
+                  type="password"
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  className="bg-white/[0.06] border-white/[0.08] h-11 text-white placeholder:text-zinc-600"
+                  placeholder="再次输入"
+                  onKeyDown={(e) => e.key === "Enter" && doReset()}
+                />
+              </div>
+              <Button className="w-full h-11" onClick={doReset} disabled={loading}>
+                {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                确认重置
+              </Button>
+              <p className="text-xs text-center text-amber-400/80 leading-relaxed">
+                原密码加密格式已过期，需重置一次
+              </p>
             </div>
           )}
 
