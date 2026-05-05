@@ -12,6 +12,9 @@ interface Holding {
   quantity: number;
   avgCost: number;
   totalCost: number;
+  currentPrice?: number;
+  pnl?: number;
+  pnlPct?: number;
 }
 
 const marketLabels: Record<string, string> = { US: "美股", HK: "港股", CN: "A股" };
@@ -53,7 +56,10 @@ export function HoldingsTable({ data }: { data: Holding[] }) {
             <TableCell className="text-right font-mono">
               {h.currency} {h.totalCost.toLocaleString()}
             </TableCell>
-            <TableCell className="text-right font-mono text-emerald-400">--</TableCell>
+            <TableCell className={`text-right font-mono ${(h.pnl ?? 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+              {h.pnl !== undefined ? `${h.pnl >= 0 ? '+' : ''}${h.currency} ${Math.abs(h.pnl).toLocaleString()}` : "--"}
+              {h.pnlPct !== undefined && <span className="text-xs ml-1">({h.pnlPct >= 0 ? '+' : ''}{h.pnlPct}%)</span>}
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>

@@ -14,7 +14,6 @@ import { toast } from "sonner";
 
 export function AppShell() {
   const [tab, setTab] = useState("dashboard");
-  const [dashKey, setDashKey] = useState(0);
   const [unlocked, setUnlocked] = useState(false);
 
   const handleUnlock = useCallback(() => setUnlocked(true), []);
@@ -41,8 +40,8 @@ export function AppShell() {
   }
 
   return (
-    <Tabs value={tab} onValueChange={(v) => { setTab(v); if (v === "dashboard") setDashKey(k => k + 1); }}>
-      <div className="min-h-screen bg-zinc-950 text-zinc-100">
+    <Tabs value={tab} onValueChange={setTab}>
+      <div className="min-h-screen w-full bg-zinc-950 text-zinc-100">
         <header className="sticky top-0 z-50 glass">
           <div className="flex items-center justify-between px-3 md:px-6 py-3 md:py-4">
             <div className="flex items-center gap-2 md:gap-3">
@@ -81,7 +80,7 @@ export function AppShell() {
 
         <main className="px-3 md:px-6 py-4 md:py-6 w-full">
           <TabsContent value="dashboard" className="mt-0">
-            <DashboardTab key={dashKey} />
+            <DashboardTab visible={tab === "dashboard"} />
           </TabsContent>
           <TabsContent value="transactions" className="mt-0">
             <TransactionsTab />

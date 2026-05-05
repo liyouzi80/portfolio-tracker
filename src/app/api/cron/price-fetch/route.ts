@@ -1,12 +1,15 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db";
 import { alerts, assets } from "@/db/schema";
 import { getPlatformEnv } from "@/lib/env";
 import { fetchYahooPrice, fetchLongbridgePrice } from "@/lib/price";
 import { eq } from "drizzle-orm";
 
-
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const secret = typeof process !== "undefined" && process.env?.CRON_SECRET;
+  if (secret && req.nextUrl.searchParams.get("secret") !== secret) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const { DB, PRICE_CACHE } = getPlatformEnv();
   const db = getDb(DB);
 
@@ -50,6 +53,7 @@ export async function GET() {
         let triggered = false;
         if (alert.conditionType === "price_above" && price > alert.threshold) triggered = true;
         if (alert.conditionType === "price_below" && price < alert.threshold) triggered = true;
+        if (alert.conditionType === "change_pct" && Math.abs((price - (alert as any).lastPrice || price) / price * 100) > alert.threshold) triggered = true;
 
         if (triggered) {
           await db.update(alerts)

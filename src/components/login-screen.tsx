@@ -268,6 +268,9 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
           {/* Reset password (triggered when server returns needsReset) */}
           {mode === "reset" && (
             <div className="space-y-3">
+              <p className="text-xs text-amber-400/80 text-center leading-relaxed">
+                旧密码因安全升级已失效，请重新设置。完成后需重新注册 Passkey（如已注册）。
+              </p>
               <div className="space-y-2">
                 <Label className="text-zinc-400 text-xs">新密码</Label>
                 <Input

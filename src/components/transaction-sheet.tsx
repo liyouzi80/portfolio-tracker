@@ -47,6 +47,8 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
   const [symbolName, setSymbolName] = useState("");
   const [lookingUp, setLookingUp] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [searchResults, setSearchResults] = useState<Array<{ symbol: string; name: string; exchange: string }>>([]);
+  const [showSearch, setShowSearch] = useState(false);
   const lookupTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const resetForm = () => {
@@ -61,7 +63,20 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
       date: new Date().toISOString().slice(0, 10),
     });
     setSymbolName("");
+    setSearchResults([]);
+    setShowSearch(false);
   };
+
+  // Auto-detect market from symbol format
+  function detectMarket(sym: string): string {
+    const s = sym.toUpperCase().trim();
+    if (/^\d{6}$/.test(s)) return "CN";       // 600519 → A-share
+    if (/^\d{4,5}$/.test(s)) return "HK";     // 0700, 01810 → HK
+    if (/\.HK$/i.test(s)) return "HK";
+    if (/\.SS$/i.test(s)) return "CN";
+    if (/\.SZ$/i.test(s)) return "CN";
+    return "US"; // Default: letters → US
+  }
 
   const lookupSymbol = useCallback(async (symbol: string, market: string) => {
     if (!symbol || symbol.length < 1) { setSymbolName(""); return; }
@@ -74,10 +89,41 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
     setLookingUp(false);
   }, []);
 
+  const searchSymbols = useCallback(async (query: string) => {
+    if (!query || query.length < 1) { setSearchResults([]); setShowSearch(false); return; }
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+      const data = await res.json() as Array<{ symbol: string; name: string; exchange: string }>;
+      setSearchResults(data);
+      setShowSearch(data.length > 0);
+    } catch { setSearchResults([]); setShowSearch(false); }
+  }, []);
+
+  const selectSearchResult = (item: { symbol: string; name: string }) => {
+    // Parse symbol like "01810.HK" → symbol: "01810", market: "HK"
+    const parts = item.symbol.split(".");
+    const sym = parts[0];
+    const market = parts[1] === "HK" ? "HK" : parts[1] === "SS" || parts[1] === "SZ" ? "CN" : detectMarket(sym);
+    setForm({ ...form, symbol: sym, market });
+    setSymbolName(item.name);
+    setShowSearch(false);
+    setSearchResults([]);
+  };
+
   const handleSymbolChange = (value: string) => {
-    setForm({ ...form, symbol: value });
+    // Strip market suffix if pasted
+    const clean = value.toUpperCase().replace(/\.(HK|SS|SZ)$/i, "");
+    const market = detectMarket(value);
+    setForm({ ...form, symbol: clean, market });
+    setSymbolName("");
+    setShowSearch(false);
     if (lookupTimer.current) clearTimeout(lookupTimer.current);
-    lookupTimer.current = setTimeout(() => lookupSymbol(value, form.market), 400);
+    // For short/numeric symbols, verify price; for names, search
+    if (/^[A-Z0-9]+$/.test(clean) && clean.length >= 1) {
+      lookupTimer.current = setTimeout(() => lookupSymbol(clean, market), 400);
+    } else {
+      lookupTimer.current = setTimeout(() => searchSymbols(value), 400);
+    }
   };
 
   const handleMarketChange = (market: string) => {
@@ -147,20 +193,36 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
             {/* Symbol + Market */}
             <div className="grid grid-cols-5 gap-3">
               <div className="col-span-3 space-y-2">
-                <Label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">代码</Label>
+                <Label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">代码或名称</Label>
                 <div className="relative">
                   <Input
                     value={form.symbol}
                     onChange={(e) => handleSymbolChange(e.target.value)}
-                    className="bg-zinc-900 border-zinc-700 h-11 text-sm font-mono uppercase placeholder:text-zinc-600 pr-8"
-                    placeholder="AAPL"
+                    className="bg-zinc-900 border-zinc-700 h-11 text-sm font-mono placeholder:text-zinc-600 pr-8"
+                    placeholder="AAPL / 小米 / 0700"
                   />
                   {lookingUp && (
                     <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500 animate-spin" />
                   )}
                 </div>
-                {symbolName && (
+                {symbolName && !showSearch && (
                   <p className="text-xs text-emerald-400/80 truncate">{symbolName}</p>
+                )}
+                {/* Search results dropdown */}
+                {showSearch && (
+                  <div className="absolute z-50 mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                    {searchResults.map((r, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-zinc-800 flex items-center justify-between"
+                        onClick={() => selectSearchResult(r)}
+                      >
+                        <span className="font-mono text-white">{r.symbol}</span>
+                        <span className="text-xs text-zinc-400 truncate ml-2">{r.name}</span>
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
               <div className="col-span-2 space-y-2">
