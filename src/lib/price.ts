@@ -77,16 +77,6 @@ interface LongportCredentials {
   accessToken: string;
 }
 
-export async function getLongbridgeCredsFromD1(d1: D1Database): Promise<LongportCredentials | null> {
-  const rows = await d1
-    .prepare("SELECT key, value FROM auth WHERE key IN ('setting:lbKey','setting:lbSecret','setting:lbAccessToken')")
-    .all<{ key: string; value: string }>();
-  const map: Record<string, string> = {};
-  for (const row of rows.results) map[row.key.replace("setting:", "")] = row.value;
-  if (!map.lbKey || !map.lbSecret || !map.lbAccessToken) return null;
-  return { appKey: map.lbKey, appSecret: map.lbSecret, accessToken: map.lbAccessToken };
-}
-
 export async function fetchLongbridgePrice(symbol: string, market: string, creds?: LongportCredentials): Promise<number | null> {
   const appKey = creds?.appKey || process.env.LONGPORT_APP_KEY || process.env.LONGBRIDGE_APP_KEY;
   const appSecret = creds?.appSecret || process.env.LONGPORT_APP_SECRET || process.env.LONGBRIDGE_APP_SECRET;

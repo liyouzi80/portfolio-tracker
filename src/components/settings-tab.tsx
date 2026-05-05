@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AccountSheet } from "./account-sheet";
 import { AlertSheet } from "./alert-sheet";
-import { Plus, Pencil, Trash2, Zap, Check, Fingerprint, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Zap, Fingerprint, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 const PRF_SALT = "portfolio-tracker-prf-salt-v1";
@@ -56,24 +56,7 @@ export function SettingsTab() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [alertOpen, setAlertOpen] = useState(false);
   const [dataSource, setDataSource] = useState("yahoo");
-  const [lbKey, setLbKey] = useState("");
-  const [lbSecret, setLbSecret] = useState("");
-  const [lbAccessToken, setLbAccessToken] = useState("");
-  const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/settings")
-      .then((r) => r.ok ? r.json() as Promise<{ dataSource: string; lbKey: string; lbSecret: string; lbAccessToken: string }> : null)
-      .then((d) => {
-        if (!d) return;
-        setDataSource(d.dataSource || "yahoo");
-        setLbKey(d.lbKey || "");
-        setLbSecret(d.lbSecret || "");
-        setLbAccessToken(d.lbAccessToken || "");
-      })
-      .catch(() => {});
-  }, []);
   const [registeringPasskey, setRegisteringPasskey] = useState(false);
   const passkeyAvailable = typeof window !== "undefined" && !!window.PublicKeyCredential;
 
@@ -118,22 +101,6 @@ export function SettingsTab() {
       toast.error(e.message || "Passkey 注册失败");
     }
     setRegisteringPasskey(false);
-  };
-
-  const handleSaveDataSource = async () => {
-    setSaving(true);
-    try {
-      const res = await fetch("/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dataSource, lbKey, lbSecret, lbAccessToken }),
-      });
-      if (res.ok) toast.success("数据源配置已保存");
-      else toast.error("保存失败");
-    } catch {
-      toast.error("网络错误");
-    }
-    setSaving(false);
   };
 
   const handleTestConnection = async () => {
@@ -311,28 +278,16 @@ export function SettingsTab() {
             </Select>
           </div>
 
-          {dataSource === "longbridge" && (
-            <div className="space-y-3 pt-2 border-t border-zinc-800">
-              <Label className="text-zinc-400 text-xs">长桥 API 参数</Label>
-              <Input className="bg-zinc-900 border-zinc-700 h-9 text-sm" placeholder="App Key" type="password" value={lbKey} onChange={(e) => setLbKey(e.target.value)} />
-              <Input className="bg-zinc-900 border-zinc-700 h-9 text-sm" placeholder="App Secret" type="password" value={lbSecret} onChange={(e) => setLbSecret(e.target.value)} />
-              <Input className="bg-zinc-900 border-zinc-700 h-9 text-sm" placeholder="Access Token" type="password" value={lbAccessToken} onChange={(e) => setLbAccessToken(e.target.value)} />
-              <p className="text-xs text-zinc-600">从长桥开放平台获取: open.longportapp.com</p>
-            </div>
-          )}
-
           <div className="flex gap-2 pt-2 border-t border-zinc-800">
             <Button size="sm" variant="outline" className="border-zinc-700 text-zinc-300" onClick={handleTestConnection} disabled={testing}>
               <Zap className="h-3.5 w-3.5 mr-1" />
               {testing ? "测试中..." : "测试连接"}
             </Button>
-            <Button size="sm" onClick={handleSaveDataSource} disabled={saving}>
-              {saving ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Check className="h-3.5 w-3.5 mr-1" />}
-              {saving ? "保存中..." : "保存配置"}
-            </Button>
           </div>
           <p className="text-xs text-zinc-500">
-            {dataSource === "yahoo" ? "Yahoo Finance 免费无需 API Key，但稳定性一般。" : "长桥需要 API Key，未配置时自动使用 Yahoo Finance 备用。"}
+            {dataSource === "longbridge"
+              ? "长桥凭证通过 GitHub Secrets (LONGBRIDGE_APP_KEY / APP_SECRET / ACCESS_TOKEN) 注入，无需在此填写。"
+              : "Yahoo Finance 免费无需 API Key，但稳定性一般。"}
           </p>
         </CardContent>
       </Card>
