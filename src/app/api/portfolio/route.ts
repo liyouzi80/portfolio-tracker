@@ -199,11 +199,12 @@ export async function GET(req: NextRequest) {
       dateMap.set(d, cur);
     }
 
-    // Fill daily from one day before earliest to today (starts from zero)
+    // Fill daily: day 0 (earliestDate) = 0, costs accumulate from day 1
+    const chartPoints: ChartPoint[] = [{ date: earliestDate, value: 0 }];
     let runningCost = 0;
-    const start = new Date(earliestDate); // First order date
+    const start = new Date(earliestDate);
+    start.setDate(start.getDate() + 1); // Start accumulating from day after first order
     const end = new Date();
-    const chartPoints: ChartPoint[] = [];
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const ds = d.toISOString().slice(0, 10);
       if (dateMap.has(ds)) {
