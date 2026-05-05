@@ -2,9 +2,15 @@ import { SignJWT, jwtVerify } from "jose";
 
 // Use env secret or generate a random one (changes on restart, invalidating all sessions)
 // In production, always set JWT_SECRET env var for persistent sessions
-const SECRET_KEY = process.env.JWT_SECRET
-  ? new TextEncoder().encode(process.env.JWT_SECRET)
-  : null;
+function getEnvSecretKey(): Uint8Array | null {
+  try {
+    if (typeof process !== "undefined" && process.env?.JWT_SECRET) {
+      return new TextEncoder().encode(process.env.JWT_SECRET);
+    }
+  } catch { /* process or process.env not available */ }
+  return null;
+}
+const SECRET_KEY = getEnvSecretKey();
 
 const COOKIE_NAME = "pt-session";
 

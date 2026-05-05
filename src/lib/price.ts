@@ -77,10 +77,16 @@ interface LongportCredentials {
   accessToken: string;
 }
 
+function getEnv(name: string): string | undefined {
+  try {
+    return (typeof process !== "undefined" && process.env?.[name]) || undefined;
+  } catch { return undefined; }
+}
+
 export async function fetchLongbridgePrice(symbol: string, market: string, creds?: LongportCredentials): Promise<number | null> {
-  const appKey = creds?.appKey || process.env.LONGPORT_APP_KEY || process.env.LONGBRIDGE_APP_KEY;
-  const appSecret = creds?.appSecret || process.env.LONGPORT_APP_SECRET || process.env.LONGBRIDGE_APP_SECRET;
-  const accessToken = creds?.accessToken || process.env.LONGPORT_ACCESS_TOKEN || process.env.LONGBRIDGE_ACCESS_TOKEN;
+  const appKey = creds?.appKey || getEnv("LONGPORT_APP_KEY") || getEnv("LONGBRIDGE_APP_KEY");
+  const appSecret = creds?.appSecret || getEnv("LONGPORT_APP_SECRET") || getEnv("LONGBRIDGE_APP_SECRET");
+  const accessToken = creds?.accessToken || getEnv("LONGPORT_ACCESS_TOKEN") || getEnv("LONGBRIDGE_ACCESS_TOKEN");
 
   if (!appKey || !appSecret || !accessToken) throw new Error("Longbridge not configured");
 
