@@ -41,7 +41,7 @@ const defaultForm = {
   quantity: "",
   price: "",
   fee: "",
-  date: new Date().toISOString().slice(0, 10),
+  date: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`,
 };
 
 export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props) {
@@ -131,6 +131,9 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
   const selectedType = typeOptions.find(t => t.value === form.type);
   const TypeIcon = selectedType?.icon ?? ArrowUpRight;
   const priceLabel = marketCurrency[form.market] || "USD";
+  const selectedAccount = accounts.find(a => a.id === form.accountId);
+  const accountCurrency = selectedAccount?.currency;
+  const showDualCurrency = accountCurrency && accountCurrency !== priceLabel;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -296,11 +299,16 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
             {/* Estimated Total */}
             {estimatedTotal !== "" && (
               <div className="flex items-center justify-between px-4 py-3 rounded-lg bg-zinc-900/50 border border-zinc-800">
-                <span className="text-sm text-zinc-400">预估总额</span>
-                <span className="text-sm font-mono font-semibold">
-                  <TypeIcon className={`h-3.5 w-3.5 inline mr-1 ${selectedType?.color}`} />
-                  {priceLabel} {estimatedTotal}
+                <span className="text-sm text-zinc-400">
+                  预估总额
+                  {showDualCurrency && <span className="text-xs text-zinc-500 ml-1">({accountCurrency} 账户)</span>}
                 </span>
+                <div className="text-right">
+                  <span className="text-sm font-mono font-semibold">
+                    <TypeIcon className={`h-3.5 w-3.5 inline mr-1 ${selectedType?.color}`} />
+                    {priceLabel} {estimatedTotal}
+                  </span>
+                </div>
               </div>
             )}
 

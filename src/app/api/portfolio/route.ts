@@ -26,6 +26,8 @@ interface AccountSummary {
   totalCost: number;
   totalMarketValue?: number;
   totalPnl?: number;
+  realizedPnl?: number;
+  unrealizedPnl?: number;
   holdings: Holding[];
 }
 
@@ -51,8 +53,9 @@ export async function GET(req: NextRequest) {
     const fromCny = allRates.find(r => r.fromCurrency === from && r.toCurrency === "CNY");
     const toCny = allRates.find(r => r.fromCurrency === to && r.toCurrency === "CNY");
     if (fromCny && toCny && toCny.rate > 0) return fromCny.rate / toCny.rate;
-    return 1;
+    return 0; // No rate available — mark data as unreliable instead of silently 1:1
   };
+  const missingRates = new Set<string>();
 
   // Fetch cached prices from KV for all holdings
   const { PRICE_CACHE } = getPlatformEnv();
@@ -70,11 +73,18 @@ export async function GET(req: NextRequest) {
       .all();
 
     const holdingsMap = new Map<string, Holding>();
+    let realizedPnl = 0; // Track closed-position P&L
 
     for (const row of txns) {
       const txn = row.transactions;
       const asset = row.assets;
       if (!asset) continue;
+
+      // Handle dividend — adds to realized P&L, doesn't affect quantity
+      if (txn.type === "dividend") {
+        realizedPnl += txn.quantity * txn.price; // quantity=shares, price=dividend per share
+        continue;
+      }
 
       const key = `${acc.id}:${asset.id}`;
       const existing = holdingsMap.get(key) ?? {
@@ -95,6 +105,9 @@ export async function GET(req: NextRequest) {
         existing.totalFee += txn.fee ?? 0;
       } else if (txn.type === "sell") {
         const avgCost = existing.quantity > 0 ? existing.totalCost / existing.quantity : 0;
+        const sellValue = txn.quantity * txn.price - (txn.fee ?? 0);
+        const costBasis = txn.quantity * avgCost;
+        realizedPnl += sellValue - costBasis; // Capture realized P&L
         existing.quantity -= txn.quantity;
         existing.totalCost -= txn.quantity * avgCost;
       }
@@ -103,6 +116,7 @@ export async function GET(req: NextRequest) {
         existing.avgCost = existing.quantity > 0 ? existing.totalCost / existing.quantity : 0;
         holdingsMap.set(key, existing);
       } else {
+        // Closed position — remove from active holdings but P&L is preserved
         holdingsMap.delete(key);
       }
     }
@@ -157,7 +171,9 @@ export async function GET(req: NextRequest) {
       currency: acc.currency,
       totalCost: Math.round(accountTotalCost * 100) / 100,
       totalMarketValue: Math.round(accountMarketValue * 100) / 100,
-      totalPnl: Math.round((accountMarketValue - accountTotalCost) * 100) / 100,
+      totalPnl: Math.round((accountMarketValue - accountTotalCost + realizedPnl) * 100) / 100,
+      realizedPnl: Math.round(realizedPnl * 100) / 100,
+      unrealizedPnl: Math.round((accountMarketValue - accountTotalCost) * 100) / 100,
       holdings,
     });
   }
@@ -185,8 +201,7 @@ export async function GET(req: NextRequest) {
 
     // Fill daily from one day before earliest to today (starts from zero)
     let runningCost = 0;
-    const start = new Date(earliestDate);
-    start.setDate(start.getDate() - 1); // zero point before first transaction
+    const start = new Date(earliestDate); // First order date
     const end = new Date();
     const chartPoints: ChartPoint[] = [];
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {

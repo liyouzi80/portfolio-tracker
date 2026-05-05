@@ -55,7 +55,7 @@ export function AppShell() {
       <div className="min-h-screen w-full bg-zinc-950 text-zinc-100">
         <header className="sticky top-0 z-50 glass">
           <div className="flex items-center justify-between px-3 md:px-6 py-3 md:py-4">
-            <div className="flex items-center gap-2 md:gap-3">
+            <button onClick={() => setTab("dashboard")} className="flex items-center gap-2 md:gap-3 hover:opacity-80 transition-opacity cursor-pointer">
               <svg className="h-6 w-6 md:h-8 md:w-8" viewBox="0 0 32 32" fill="none">
                 <rect width="32" height="32" rx="8" fill="url(#logo-grad)" />
                 <path d="M10 22V12l6 8 6-8v10" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
@@ -67,7 +67,7 @@ export function AppShell() {
                 </defs>
               </svg>
               <h1 className="text-lg font-semibold tracking-tight">Portfolio</h1>
-            </div>
+            </button>
             <div className="flex items-center gap-2">
               <TabsList className="bg-zinc-900 border border-zinc-800 text-xs md:text-sm">
                 <TabsTrigger value="dashboard" className="data-[state=active]:bg-zinc-800">
