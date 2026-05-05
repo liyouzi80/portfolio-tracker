@@ -14,6 +14,8 @@ interface Holding {
   totalCost: number;
 }
 
+const marketLabels: Record<string, string> = { US: "美股", HK: "港股", CN: "A股" };
+
 const marketColors: Record<string, string> = {
   US: "bg-blue-500/10 text-blue-400 border-blue-500/20",
   HK: "bg-amber-500/10 text-amber-400 border-amber-500/20",
@@ -25,13 +27,13 @@ export function HoldingsTable({ data }: { data: Holding[] }) {
     <Table>
       <TableHeader>
         <TableRow className="border-zinc-800 hover:bg-transparent">
-          <TableHead className="text-zinc-500">Symbol</TableHead>
-          <TableHead className="text-zinc-500">Name</TableHead>
-          <TableHead className="text-zinc-500">Market</TableHead>
-          <TableHead className="text-zinc-500 text-right">Qty</TableHead>
-          <TableHead className="text-zinc-500 text-right">Avg Cost</TableHead>
-          <TableHead className="text-zinc-500 text-right">Total Cost</TableHead>
-          <TableHead className="text-zinc-500 text-right">P&L</TableHead>
+          <TableHead className="text-zinc-500">代码</TableHead>
+          <TableHead className="text-zinc-500">名称</TableHead>
+          <TableHead className="text-zinc-500">市场</TableHead>
+          <TableHead className="text-zinc-500 text-right">数量</TableHead>
+          <TableHead className="text-zinc-500 text-right">均价</TableHead>
+          <TableHead className="text-zinc-500 text-right">成本</TableHead>
+          <TableHead className="text-zinc-500 text-right">盈亏</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -41,7 +43,7 @@ export function HoldingsTable({ data }: { data: Holding[] }) {
             <TableCell className="text-zinc-300">{h.name}</TableCell>
             <TableCell>
               <Badge variant="outline" className={marketColors[h.market] ?? "border-zinc-700"}>
-                {h.market}
+                {marketLabels[h.market] ?? h.market}
               </Badge>
             </TableCell>
             <TableCell className="text-right font-mono">{h.quantity}</TableCell>

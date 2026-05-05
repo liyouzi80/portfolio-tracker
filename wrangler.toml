@@ -1,7 +1,7 @@
 name = "portfolio-tracker"
 compatibility_date = "2024-12-30"
 compatibility_flags = ["nodejs_compat"]
-pages_build_output_dir = ".vercel/output/static"
+pages_build_output_dir = ".open-next/cloudflare"
 
 [[d1_databases]]
 binding = "DB"
@@ -11,6 +11,3 @@ database_id = "8e567040-fecb-428d-b75d-e29ce0e73b31"
 [[kv_namespaces]]
 binding = "PRICE_CACHE"
 id = "86f512e06ba1486dad6ede0080ecf379"
-
-# Cron triggers for price fetching must be configured via Cloudflare Dashboard
-# or via a separate Worker with wrangler triggers

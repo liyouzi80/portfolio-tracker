@@ -3,10 +3,10 @@
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 
 const data = [
-  { name: "US Stocks", value: 45000, color: "#3b82f6" },
-  { name: "HK Stocks", value: 152000, color: "#f59e0b" },
-  { name: "CN Stocks", value: 178000, color: "#ef4444" },
-  { name: "Cash", value: 10000, color: "#71717a" },
+  { name: "美股", value: 45000, color: "#3b82f6" },
+  { name: "港股", value: 152000, color: "#f59e0b" },
+  { name: "A股", value: 178000, color: "#ef4444" },
+  { name: "现金", value: 10000, color: "#71717a" },
 ];
 
 export function AllocationPie() {

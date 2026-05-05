@@ -6,7 +6,8 @@ import { eq } from "drizzle-orm";
 
 export const runtime = "edge";
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const db = getDb(getPlatformEnv().DB);
   const body = await req.json() as { accountId?: string; assetId?: string; type?: string; quantity?: number; price?: number; fee?: number; date?: string; notes?: string };
   await db.update(transactions).set({
@@ -18,6 +19,6 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     fee: body.fee,
     date: body.date,
     notes: body.notes,
-  }).where(eq(transactions.id, params.id));
+  }).where(eq(transactions.id, id));
   return NextResponse.json({ success: true });
 }

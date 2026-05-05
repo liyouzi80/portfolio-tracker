@@ -19,31 +19,31 @@ export function AlertSheet({ open, onOpenChange }: Props) {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="bg-zinc-950 border-zinc-800 text-zinc-100 sm:max-w-md">
         <SheetHeader>
-          <SheetTitle className="text-zinc-100">New Price Alert</SheetTitle>
+          <SheetTitle className="text-zinc-100">添加价格提醒</SheetTitle>
         </SheetHeader>
         <div className="space-y-4 mt-6">
           <div className="space-y-2">
-            <Label className="text-zinc-400">Symbol</Label>
+            <Label className="text-zinc-400">股票代码</Label>
             <Input value={form.symbol} onChange={(e) => setForm({ ...form, symbol: e.target.value })} className="bg-zinc-900 border-zinc-700" placeholder="AAPL" />
           </div>
           <div className="space-y-2">
-            <Label className="text-zinc-400">Condition</Label>
+            <Label className="text-zinc-400">条件</Label>
             <Select value={form.condition} onValueChange={(v) => v && setForm({ ...form, condition: v })}>
               <SelectTrigger className="bg-zinc-900 border-zinc-700">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="price_above">Price Above</SelectItem>
-                <SelectItem value="price_below">Price Below</SelectItem>
-                <SelectItem value="change_pct">Change %</SelectItem>
+                <SelectItem value="price_above">价格高于</SelectItem>
+                <SelectItem value="price_below">价格低于</SelectItem>
+                <SelectItem value="change_pct">涨跌幅超过</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label className="text-zinc-400">Threshold</Label>
+            <Label className="text-zinc-400">阈值</Label>
             <Input value={form.threshold} onChange={(e) => setForm({ ...form, threshold: e.target.value })} className="bg-zinc-900 border-zinc-700" type="number" />
           </div>
-          <Button className="w-full mt-4" onClick={() => onOpenChange(false)}>Create Alert</Button>
+          <Button className="w-full mt-4" onClick={() => onOpenChange(false)}>创建提醒</Button>
         </div>
       </SheetContent>
     </Sheet>

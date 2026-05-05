@@ -24,7 +24,6 @@ export function TransactionSheet({ open, onOpenChange }: Props) {
   });
 
   const handleSubmit = () => {
-    // TODO: API call
     onOpenChange(false);
   };
 
@@ -32,38 +31,38 @@ export function TransactionSheet({ open, onOpenChange }: Props) {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="bg-zinc-950 border-zinc-800 text-zinc-100 sm:max-w-md">
         <SheetHeader>
-          <SheetTitle className="text-zinc-100">New Transaction</SheetTitle>
+          <SheetTitle className="text-zinc-100">新增交易</SheetTitle>
         </SheetHeader>
         <div className="space-y-4 mt-6">
           <div className="space-y-2">
-            <Label className="text-zinc-400">Symbol</Label>
+            <Label className="text-zinc-400">股票代码</Label>
             <Input value={form.symbol} onChange={(e) => setForm({ ...form, symbol: e.target.value })} className="bg-zinc-900 border-zinc-700" placeholder="AAPL" />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="text-zinc-400">Market</Label>
+              <Label className="text-zinc-400">市场</Label>
               <Select value={form.market} onValueChange={(v) => v && setForm({ ...form, market: v })}>
                 <SelectTrigger className="bg-zinc-900 border-zinc-700">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="US">US</SelectItem>
-                  <SelectItem value="HK">HK</SelectItem>
-                  <SelectItem value="CN">CN</SelectItem>
+                  <SelectItem value="US">美股</SelectItem>
+                  <SelectItem value="HK">港股</SelectItem>
+                  <SelectItem value="CN">A股</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label className="text-zinc-400">Type</Label>
+              <Label className="text-zinc-400">类型</Label>
               <Select value={form.type} onValueChange={(v) => v && setForm({ ...form, type: v })}>
                 <SelectTrigger className="bg-zinc-900 border-zinc-700">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="buy">Buy</SelectItem>
-                  <SelectItem value="sell">Sell</SelectItem>
-                  <SelectItem value="dividend">Dividend</SelectItem>
+                  <SelectItem value="buy">买入</SelectItem>
+                  <SelectItem value="sell">卖出</SelectItem>
+                  <SelectItem value="dividend">股息</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -71,27 +70,27 @@ export function TransactionSheet({ open, onOpenChange }: Props) {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="text-zinc-400">Quantity</Label>
+              <Label className="text-zinc-400">数量</Label>
               <Input value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} className="bg-zinc-900 border-zinc-700" type="number" />
             </div>
             <div className="space-y-2">
-              <Label className="text-zinc-400">Price</Label>
+              <Label className="text-zinc-400">价格</Label>
               <Input value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="bg-zinc-900 border-zinc-700" type="number" />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="text-zinc-400">Fee</Label>
+              <Label className="text-zinc-400">手续费</Label>
               <Input value={form.fee} onChange={(e) => setForm({ ...form, fee: e.target.value })} className="bg-zinc-900 border-zinc-700" type="number" />
             </div>
             <div className="space-y-2">
-              <Label className="text-zinc-400">Date</Label>
+              <Label className="text-zinc-400">日期</Label>
               <Input value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="bg-zinc-900 border-zinc-700" type="date" />
             </div>
           </div>
 
-          <Button onClick={handleSubmit} className="w-full mt-4">Save Transaction</Button>
+          <Button onClick={handleSubmit} className="w-full mt-4">保存交易</Button>
         </div>
       </SheetContent>
     </Sheet>

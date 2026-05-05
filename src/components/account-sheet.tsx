@@ -19,15 +19,15 @@ export function AccountSheet({ open, onOpenChange }: Props) {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="bg-zinc-950 border-zinc-800 text-zinc-100 sm:max-w-md">
         <SheetHeader>
-          <SheetTitle className="text-zinc-100">New Account</SheetTitle>
+          <SheetTitle className="text-zinc-100">添加账户</SheetTitle>
         </SheetHeader>
         <div className="space-y-4 mt-6">
           <div className="space-y-2">
-            <Label className="text-zinc-400">Account Name</Label>
-            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="bg-zinc-900 border-zinc-700" placeholder="e.g., Main Brokerage" />
+            <Label className="text-zinc-400">账户名称</Label>
+            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="bg-zinc-900 border-zinc-700" placeholder="例如：盈透证券" />
           </div>
           <div className="space-y-2">
-            <Label className="text-zinc-400">Base Currency</Label>
+            <Label className="text-zinc-400">基准币种</Label>
             <Select value={form.currency} onValueChange={(v) => v && setForm({ ...form, currency: v })}>
               <SelectTrigger className="bg-zinc-900 border-zinc-700">
                 <SelectValue />
@@ -40,10 +40,10 @@ export function AccountSheet({ open, onOpenChange }: Props) {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label className="text-zinc-400">Leverage</Label>
+            <Label className="text-zinc-400">杠杆率</Label>
             <Input value={form.leverage} onChange={(e) => setForm({ ...form, leverage: e.target.value })} className="bg-zinc-900 border-zinc-700" type="number" min="1" />
           </div>
-          <Button className="w-full mt-4" onClick={() => onOpenChange(false)}>Save Account</Button>
+          <Button className="w-full mt-4" onClick={() => onOpenChange(false)}>保存账户</Button>
         </div>
       </SheetContent>
     </Sheet>

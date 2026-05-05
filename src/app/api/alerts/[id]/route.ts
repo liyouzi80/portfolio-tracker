@@ -6,13 +6,14 @@ import { eq } from "drizzle-orm";
 
 export const runtime = "edge";
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const db = getDb(getPlatformEnv().DB);
   const body = await req.json() as { conditionType?: string; threshold?: number; enabled?: number };
   await db.update(alerts).set({
     conditionType: body.conditionType,
     threshold: body.threshold,
     enabled: body.enabled,
-  }).where(eq(alerts.id, params.id));
+  }).where(eq(alerts.id, id));
   return NextResponse.json({ success: true });
 }

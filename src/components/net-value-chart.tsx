@@ -24,7 +24,7 @@ export function NetValueChart() {
         <YAxis tick={{ fontSize: 11, fill: "#71717a" }} tickLine={false} axisLine={false} tickFormatter={(v) => `¥${(v / 10000).toFixed(1)}w`} />
         <Tooltip
           contentStyle={{ background: "#18181b", border: "1px solid #27272a", borderRadius: "8px", fontSize: "13px" }}
-          formatter={(v) => [`¥${Number(v).toLocaleString()}`, "Net Value"]}
+          formatter={(v) => [`¥${Number(v).toLocaleString()}`, "净值"]}
         />
         <Area type="monotone" dataKey="value" stroke="#34d399" strokeWidth={2} fill="url(#netValueGrad)" />
       </AreaChart>

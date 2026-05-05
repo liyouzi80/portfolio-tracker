@@ -17,18 +17,18 @@ export function AppShell() {
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500" />
-            <h1 className="text-lg font-semibold tracking-tight">Portfolio</h1>
+            <h1 className="text-lg font-semibold tracking-tight">股票持仓管理</h1>
           </div>
           <Tabs value={tab} onValueChange={setTab}>
             <TabsList className="bg-zinc-900 border border-zinc-800">
               <TabsTrigger value="dashboard" className="data-[state=active]:bg-zinc-800">
-                Overview
+                总览
               </TabsTrigger>
               <TabsTrigger value="transactions" className="data-[state=active]:bg-zinc-800">
-                Transactions
+                交易记录
               </TabsTrigger>
               <TabsTrigger value="settings" className="data-[state=active]:bg-zinc-800">
-                Settings
+                设置
               </TabsTrigger>
             </TabsList>
           </Tabs>

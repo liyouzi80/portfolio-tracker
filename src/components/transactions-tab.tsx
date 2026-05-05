@@ -18,6 +18,8 @@ const mockTxns = [
   { id: "4", symbol: "AAPL", type: "sell", quantity: 10, price: 185, fee: 0, date: "2026-03-20", market: "US", currency: "USD" },
 ];
 
+const typeLabels: Record<string, string> = { buy: "买入", sell: "卖出", dividend: "股息" };
+
 const typeColors: Record<string, string> = {
   buy: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
   sell: "bg-red-500/10 text-red-400 border-red-500/20",
@@ -40,15 +42,15 @@ export function TransactionsTab() {
     <Card className="bg-zinc-900/50 border-zinc-800">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">Transactions</CardTitle>
+          <CardTitle className="text-sm font-medium">交易记录</CardTitle>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" className="border-zinc-700 text-zinc-300" onClick={() => setImportOpen(true)}>
               <Upload className="h-4 w-4 mr-1" />
-              Import
+              导入
             </Button>
             <Button size="sm" onClick={() => setSheetOpen(true)}>
               <Plus className="h-4 w-4 mr-1" />
-              Add
+              新增
             </Button>
           </div>
         </div>
@@ -57,7 +59,7 @@ export function TransactionsTab() {
           <div className="relative flex-1">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
             <Input
-              placeholder="Search symbol..."
+              placeholder="搜索代码..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-8 bg-zinc-900 border-zinc-700 h-9 text-sm"
@@ -68,10 +70,10 @@ export function TransactionsTab() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="buy">Buy</SelectItem>
-              <SelectItem value="sell">Sell</SelectItem>
-              <SelectItem value="dividend">Dividend</SelectItem>
+              <SelectItem value="all">全部</SelectItem>
+              <SelectItem value="buy">买入</SelectItem>
+              <SelectItem value="sell">卖出</SelectItem>
+              <SelectItem value="dividend">股息</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -81,13 +83,13 @@ export function TransactionsTab() {
         <Table>
           <TableHeader>
             <TableRow className="border-zinc-800 hover:bg-transparent">
-              <TableHead className="text-zinc-500">Date</TableHead>
-              <TableHead className="text-zinc-500">Symbol</TableHead>
-              <TableHead className="text-zinc-500">Type</TableHead>
-              <TableHead className="text-zinc-500 text-right">Qty</TableHead>
-              <TableHead className="text-zinc-500 text-right">Price</TableHead>
-              <TableHead className="text-zinc-500 text-right">Fee</TableHead>
-              <TableHead className="text-zinc-500 text-right">Total</TableHead>
+              <TableHead className="text-zinc-500">日期</TableHead>
+              <TableHead className="text-zinc-500">代码</TableHead>
+              <TableHead className="text-zinc-500">类型</TableHead>
+              <TableHead className="text-zinc-500 text-right">数量</TableHead>
+              <TableHead className="text-zinc-500 text-right">价格</TableHead>
+              <TableHead className="text-zinc-500 text-right">手续费</TableHead>
+              <TableHead className="text-zinc-500 text-right">总额</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -97,7 +99,7 @@ export function TransactionsTab() {
                 <TableCell className="font-mono font-medium">{t.symbol}</TableCell>
                 <TableCell>
                   <Badge variant="outline" className={typeColors[t.type] ?? "border-zinc-700"}>
-                    {t.type}
+                    {typeLabels[t.type] ?? t.type}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right font-mono">{t.quantity}</TableCell>
@@ -111,7 +113,7 @@ export function TransactionsTab() {
             {filtered.length === 0 && (
               <TableRow className="border-zinc-800">
                 <TableCell colSpan={7} className="text-center text-zinc-500 py-8">
-                  No transactions found
+                  暂无交易记录
                 </TableCell>
               </TableRow>
             )}

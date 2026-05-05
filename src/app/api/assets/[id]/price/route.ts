@@ -5,10 +5,11 @@ export const runtime = "edge";
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const { PRICE_CACHE } = getPlatformEnv();
-  const cached = await PRICE_CACHE.get(params.id, "json");
+  const cached = await PRICE_CACHE.get(id, "json");
   if (cached) return NextResponse.json(cached);
   return NextResponse.json({ price: null }, { status: 204 });
 }
