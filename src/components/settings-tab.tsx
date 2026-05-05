@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -58,31 +58,106 @@ export function SettingsTab() {
   const [dataSource, setDataSource] = useState("yahoo");
   const [testing, setTesting] = useState(false);
   const [registeringPasskey, setRegisteringPasskey] = useState(false);
+  const [loading, setLoading] = useState(true);
   const passkeyAvailable = typeof window !== "undefined" && !!window.PublicKeyCredential;
 
-  const handleAddAccount = (acc: { name: string; currency: string; leverage: number }) => {
-    setAccounts([...accounts, { id: Date.now().toString(36), ...acc }]);
-    toast.success("账户已添加");
+  const loadData = useCallback(async () => {
+    try {
+      const [accRes, alertRes] = await Promise.all([
+        fetch("/api/accounts"),
+        fetch("/api/alerts"),
+      ]);
+      if (accRes.ok) {
+        const accData = await accRes.json() as Array<{ id: string; name: string; currency: string; leverage: number }>;
+        setAccounts(accData);
+      }
+      if (alertRes.ok) {
+        const alertData = await alertRes.json() as Array<{ id: string; symbol: string; conditionType: string; threshold: number; enabled: number }>;
+        setAlerts(alertData.map((a) => ({
+          id: a.id,
+          symbol: a.symbol,
+          condition: a.conditionType,
+          threshold: a.threshold,
+          enabled: a.enabled === 1,
+        })));
+      }
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const handleAddAccount = async (acc: { name: string; currency: string; leverage: number }) => {
+    try {
+      const res = await fetch("/api/accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(acc),
+      });
+      const data = await res.json() as { id?: string; error?: string };
+      if (data.id) {
+        setAccounts([...accounts, { id: data.id, ...acc }]);
+        toast.success("账户已添加");
+      } else {
+        toast.error(data.error || "添加失败");
+      }
+    } catch { toast.error("网络错误"); }
   };
 
-  const handleDeleteAccount = (id: string) => {
-    setAccounts(accounts.filter((a) => a.id !== id));
-    toast.success("账户已删除");
+  const handleDeleteAccount = async (id: string) => {
+    try {
+      const res = await fetch(`/api/accounts?id=${id}`, { method: "DELETE" });
+      const data = await res.json() as { success?: boolean; error?: string };
+      if (data.success) {
+        setAccounts(accounts.filter((a) => a.id !== id));
+        toast.success("账户已删除");
+      } else {
+        toast.error(data.error || "删除失败");
+      }
+    } catch { toast.error("网络错误"); }
   };
 
-  const handleAddAlert = (a: { symbol: string; condition: string; threshold: number }) => {
-    setAlerts([...alerts, { id: Date.now().toString(36), ...a, enabled: true }]);
-    toast.success("提醒已创建");
+  const handleAddAlert = async (a: { symbol: string; condition: string; threshold: number }) => {
+    try {
+      const market = /^\d/.test(a.symbol) ? "CN" : /\.HK$/i.test(a.symbol) ? "HK" : "US";
+      const res = await fetch("/api/alerts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol: a.symbol, market, conditionType: a.condition, threshold: a.threshold }),
+      });
+      const data = await res.json() as { id?: string; error?: string };
+      if (data.id) {
+        setAlerts([...alerts, { id: data.id, ...a, enabled: true }]);
+        toast.success("提醒已创建");
+      } else {
+        toast.error(data.error || "创建失败");
+      }
+    } catch { toast.error("网络错误"); }
   };
 
-  const handleDeleteAlert = (id: string) => {
-    setAlerts(alerts.filter((a) => a.id !== id));
-    toast.success("提醒已删除");
+  const handleDeleteAlert = async (id: string) => {
+    try {
+      await fetch(`/api/alerts?id=${id}`, { method: "DELETE" });
+      setAlerts(alerts.filter((a) => a.id !== id));
+      toast.success("提醒已删除");
+    } catch { toast.error("网络错误"); }
   };
 
-  const handleToggleAlert = (id: string) => {
-    setAlerts(alerts.map((a) => a.id === id ? { ...a, enabled: !a.enabled } : a));
-    toast.success("提醒状态已更新");
+  const handleToggleAlert = async (id: string) => {
+    const alert = alerts.find((a) => a.id === id);
+    if (!alert) return;
+    const newEnabled = !alert.enabled;
+    setAlerts(alerts.map((a) => a.id === id ? { ...a, enabled: newEnabled } : a));
+    try {
+      await fetch(`/api/alerts/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: newEnabled ? 1 : 0 }),
+      });
+    } catch {
+      setAlerts(alerts.map((a) => a.id === id ? { ...a, enabled: !newEnabled } : a));
+      toast.error("更新失败");
+    }
   };
 
   const handleRegisterPasskey = async () => {
@@ -118,6 +193,12 @@ export function SettingsTab() {
 
   return (
     <div className="space-y-6">
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-6 w-6 text-zinc-500 animate-spin" />
+        </div>
+      ) : (
+      <>
       {/* Accounts */}
       <Card className="t-tab-content t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
         <CardHeader>
@@ -283,6 +364,8 @@ export function SettingsTab() {
 
       <AccountSheet open={accountOpen} onOpenChange={setAccountOpen} onSave={handleAddAccount} />
       <AlertSheet open={alertOpen} onOpenChange={setAlertOpen} onSave={handleAddAlert} />
+      </>
+      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { getDb } from "@/db";
 import { assets } from "@/db/schema";
 import { cuid } from "@/lib/cuid";
 import { getPlatformEnv } from "@/lib/env";
-import { like } from "drizzle-orm";
+import { like, and, eq } from "drizzle-orm";
 
 
 export async function GET(req: NextRequest) {
@@ -21,6 +21,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const db = getDb(getPlatformEnv().DB);
   const body = await req.json() as { symbol: string; name?: string; market: string; currency: string; assetType?: string };
+  // Get or create
+  const existing = await db.select().from(assets)
+    .where(and(eq(assets.symbol, body.symbol), eq(assets.market, body.market)))
+    .all();
+  if (existing.length > 0) return NextResponse.json({ id: existing[0].id });
+
   const id = cuid();
   await db.insert(assets).values({
     id,

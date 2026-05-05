@@ -76,9 +76,35 @@ export function TransactionsTab() {
     setDeleting(null);
   };
 
-  const handleSaveTxn = (t: { accountId: string; symbol: string; market: string; type: string; quantity: number; price: number; fee: number; date: string }) => {
-    const acc = accounts.find((a) => a.id === t.accountId);
-    setTxns([{ id: Date.now().toString(36), ...t, currency: acc?.currency ?? "USD" }, ...txns]);
+  const handleSaveTxn = async (t: { accountId: string; symbol: string; market: string; type: string; quantity: number; price: number; fee: number; date: string }) => {
+    try {
+      const acc = accounts.find((a) => a.id === t.accountId);
+      const currency = acc?.currency ?? (t.market === "HK" ? "HKD" : t.market === "CN" ? "CNY" : "USD");
+      // Ensure asset exists
+      const assetRes = await fetch("/api/assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol: t.symbol.toUpperCase(), name: t.symbol.toUpperCase(), market: t.market, currency, assetType: "stock" }),
+      });
+      const assetData = await assetRes.json() as { id?: string };
+      if (!assetData.id) throw new Error("Failed to create asset");
+
+      // Create transaction
+      const res = await fetch("/api/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId: t.accountId, assetId: assetData.id, type: t.type, quantity: t.quantity, price: t.price, fee: t.fee, date: t.date }),
+      });
+      const data = await res.json() as { id?: string; error?: string };
+      if (data.id) {
+        loadTxns();
+        toast.success("交易已保存");
+      } else {
+        toast.error(data.error || "保存失败");
+      }
+    } catch {
+      toast.error("网络错误");
+    }
   };
 
   const handleImportDone = () => {

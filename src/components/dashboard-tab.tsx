@@ -112,7 +112,7 @@ export function DashboardTab() {
           <CardTitle className="text-sm font-medium tracking-wide">盈亏走势</CardTitle>
         </CardHeader>
         <CardContent>
-          <ProfitCurve baseValue={totalValue} />
+          <ProfitCurve data={[]} />
         </CardContent>
       </Card>
 
@@ -123,7 +123,7 @@ export function DashboardTab() {
             <CardTitle className="text-sm font-medium tracking-wide">净值曲线</CardTitle>
           </CardHeader>
           <CardContent>
-            <NetValueChart baseValue={totalValue} />
+            <NetValueChart data={[]} />
           </CardContent>
         </Card>
 
