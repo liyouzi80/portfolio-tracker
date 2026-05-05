@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPlatformEnv } from "@/lib/env";
 import { fetchYahooPrice, fetchLongbridgePrice } from "@/lib/price";
 
-export const runtime = "edge";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);

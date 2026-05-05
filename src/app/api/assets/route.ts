@@ -5,7 +5,6 @@ import { cuid } from "@/lib/cuid";
 import { getPlatformEnv } from "@/lib/env";
 import { like } from "drizzle-orm";
 
-export const runtime = "edge";
 
 export async function GET(req: NextRequest) {
   const db = getDb(getPlatformEnv().DB);

@@ -4,7 +4,6 @@ import { alerts } from "@/db/schema";
 import { getPlatformEnv } from "@/lib/env";
 import { eq } from "drizzle-orm";
 
-export const runtime = "edge";
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

@@ -5,7 +5,6 @@ import { getPlatformEnv } from "@/lib/env";
 import { fetchYahooPrice, fetchLongbridgePrice } from "@/lib/price";
 import { eq } from "drizzle-orm";
 
-export const runtime = "edge";
 
 export async function GET() {
   const { DB, PRICE_CACHE } = getPlatformEnv();

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchLongbridgePrice } from "@/lib/price";
 
-export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({})) as { appKey?: string; appSecret?: string; accessToken?: string };

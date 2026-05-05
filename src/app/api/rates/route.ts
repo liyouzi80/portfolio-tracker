@@ -4,7 +4,6 @@ import { exchangeRates } from "@/db/schema";
 import { getPlatformEnv } from "@/lib/env";
 import { eq } from "drizzle-orm";
 
-export const runtime = "edge";
 
 export async function GET(req: NextRequest) {
   const db = getDb(getPlatformEnv().DB);

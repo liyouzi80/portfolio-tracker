@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPlatformEnv } from "@/lib/env";
 
-export const runtime = "edge";
 
 export async function GET(
   _req: NextRequest,

@@ -3,7 +3,6 @@ import { getDb } from "@/db";
 import { exchangeRates } from "@/db/schema";
 import { getPlatformEnv } from "@/lib/env";
 
-export const runtime = "edge";
 
 // Free exchange rate API
 const API_URL = "https://api.exchangerate-api.com/v4/latest/CNY";

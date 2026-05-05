@@ -6,7 +6,6 @@ import { getPlatformEnv } from "@/lib/env";
 import { eq } from "drizzle-orm";
 import * as XLSX from "xlsx";
 
-export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
   const db = getDb(getPlatformEnv().DB);

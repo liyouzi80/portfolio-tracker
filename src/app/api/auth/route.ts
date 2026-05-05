@@ -6,7 +6,6 @@ import {
   hashPassword, verifyPassword, isLegacyPasswordHash,
 } from "@/lib/auth";
 
-export const runtime = "edge";
 
 let tableEnsured = false;
 async function ensureTable(d1: D1Database) {
