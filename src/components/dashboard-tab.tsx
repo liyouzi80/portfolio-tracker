@@ -54,8 +54,15 @@ export function DashboardTab() {
 
   useEffect(() => {
     fetch("/api/portfolio?baseCurrency=CNY")
-      .then((r) => r.json() as Promise<PortfolioData>)
-      .then((d) => { setData(d); setLoading(false); })
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json() as Promise<PortfolioData>;
+      })
+      .then((d) => {
+        if (!d.holdings) throw new Error("Invalid response");
+        setData(d);
+        setLoading(false);
+      })
       .catch(() => { setError("加载失败"); setLoading(false); });
   }, []);
 

@@ -34,6 +34,7 @@ export function SettingsTab() {
         fetch("/api/accounts"),
         fetch("/api/alerts"),
       ]);
+      if (!accRes.ok || !alertRes.ok) throw new Error("auth required");
       const accData = await accRes.json() as Account[];
       const alertData = await alertRes.json() as Array<{
         id: string; symbol: string; conditionType: string; threshold: number; enabled: number;

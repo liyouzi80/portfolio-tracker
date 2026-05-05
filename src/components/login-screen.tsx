@@ -98,18 +98,17 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
   // Check auth status
   useEffect(() => {
     fetch("/api/auth")
-      .then((r) => r.json() as Promise<{ authenticated: boolean; needsSetup: boolean }>)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json() as Promise<{ authenticated: boolean; needsSetup: boolean }>;
+      })
       .then((d) => {
         if (d.authenticated) { onUnlock(); return; }
         setNeedsSetup(d.needsSetup);
-        // Check if passkey is available
-        if (window.PublicKeyCredential) {
-          setPasskeyAvailable(true);
-        }
+        if (window.PublicKeyCredential) setPasskeyAvailable(true);
       })
       .catch(() => {
-        // In dev without D1, skip auth
-        onUnlock();
+        setError("服务器错误，请刷新重试");
       });
   }, [onUnlock]);
 

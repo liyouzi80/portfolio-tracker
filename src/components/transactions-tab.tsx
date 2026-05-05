@@ -39,6 +39,7 @@ export function TransactionsTab() {
   const loadTxns = useCallback(async () => {
     try {
       const res = await fetch("/api/transactions");
+      if (!res.ok) throw new Error("auth required");
       const data = await res.json() as Array<{
         transactions: { id: string; type: string; quantity: number; price: number; fee: number; date: string };
         assets: { symbol: string; market: string; currency: string } | null;
