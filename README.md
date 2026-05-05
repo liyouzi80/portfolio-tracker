@@ -133,6 +133,27 @@ npm run dev        # Next.js dev server（无 D1/KV）
 npx wrangler dev   # 含 D1/KV 的完整本地环境
 ```
 
+> **注意**：`npm run dev` 使用 `next dev`，本地无 Cloudflare D1/KV。如需完整本地环境，使用 `npx wrangler dev`。
+
+---
+
+### 常见问题
+
+**CI build 失败 `Type error: Cannot find name 'lbKey'`**
+
+长桥凭证通过 GitHub Secrets 注入 Worker，不再在客户端填写。如果在 `settings-tab.tsx` 中看到此错误，检查是否引用了已移除的 `lbKey`/`lbSecret`/`lbAccessToken` 变量。
+
+**部署后 API 返回 500 / Internal Server Error**
+
+常见原因：
+1. D1 数据库未正确绑定 — 检查 `wrangler.toml` 中 `database_id` 是否正确
+2. `JWT_SECRET` 未设置或为空 — 检查 GitHub Actions Secrets
+3. 查看 Worker 日志：`wrangler tail`
+
+**`npm ci` 报 `Invalid Version`**
+
+`package-lock.json` 中可能缺少 `version` 字段。执行 `rm -rf node_modules package-lock.json && npm install --legacy-peer-deps` 重新生成。
+
 ---
 
 ## 数据结构
