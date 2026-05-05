@@ -27,11 +27,11 @@ const typeOptions = [
   { value: "dividend", label: "股息", icon: Wallet, color: "text-blue-400" },
 ];
 
-const marketOptions = [
-  { value: "US", label: "美股", hint: "USD" },
-  { value: "HK", label: "港股", hint: "HKD" },
-  { value: "CN", label: "A股", hint: "CNY" },
-];
+const marketCurrency: Record<string, string> = {
+  US: "USD", HK: "HKD", CN: "CNY", JP: "JPY", KR: "KRW",
+  GB: "GBP", DE: "EUR", FR: "EUR", NL: "EUR", ES: "EUR", IT: "EUR",
+  CH: "CHF", CA: "CAD", AU: "AUD", TW: "TWD", IN: "INR",
+};
 
 const defaultForm = {
   accountId: "",
@@ -128,9 +128,9 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
     ? (parseFloat(form.quantity) * parseFloat(form.price) + parseFloat(form.fee || "0")).toFixed(2)
     : "";
 
-  const selectedMarket = marketOptions.find(m => m.value === form.market);
   const selectedType = typeOptions.find(t => t.value === form.type);
   const TypeIcon = selectedType?.icon ?? ArrowUpRight;
+  const priceLabel = marketCurrency[form.market] || "USD";
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -171,69 +171,49 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
               </Select>
             </div>
 
-            {/* Symbol + Market */}
-            <div className="grid grid-cols-5 gap-3">
-              <div className="col-span-3 space-y-2">
-                <Label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">代码或名称</Label>
-                <div className="relative">
-                  <Input
-                    value={form.symbol}
-                    onChange={(e) => handleSymbolChange(e.target.value)}
-                    className="bg-zinc-900 border-zinc-700 h-11 text-sm font-mono placeholder:text-zinc-600 pr-8"
-                    placeholder="搜索代码或名称"
-                  />
-                  {lookingUp && (
-                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500 animate-spin" />
-                  )}
-                </div>
-                {symbolName && !showSearch && !lookingUp && (
-                  <p className="text-xs text-emerald-400/80 truncate flex items-center gap-1">
-                    <Check className="h-3 w-3 text-emerald-500" /> {symbolName}
-                  </p>
-                )}
-                {/* Search results dropdown */}
-                {showSearch && (
-                  <div className="absolute z-50 mt-1 w-[calc(60%-0.75rem)] bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl max-h-64 overflow-y-auto">
-                    {searchResults.map((r, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        className="w-full text-left px-3 py-2.5 hover:bg-zinc-800 border-b border-zinc-800 last:border-0 transition-colors"
-                        onClick={() => selectSearchResult(r)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="font-mono font-semibold text-white text-sm shrink-0">{r.symbol}</span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 bg-white/10 text-zinc-400">{r.marketLabel || r.market}</span>
-                            <span className="text-[10px] text-zinc-600">{r.currency}</span>
-                          </div>
-                          {r.price && <span className="text-xs text-zinc-400 font-mono shrink-0 ml-2">{r.price.toFixed(2)}</span>}
-                        </div>
-                        <p className="text-xs text-zinc-400 truncate mt-0.5">{r.name}{r.exchange ? ` · ${r.exchange}` : ""}</p>
-                      </button>
-                    ))}
-                  </div>
+            {/* Symbol search — market auto-detected from search results */}
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">代码或名称</Label>
+              <div className="relative">
+                <Input
+                  value={form.symbol}
+                  onChange={(e) => handleSymbolChange(e.target.value)}
+                  className="bg-zinc-900 border-zinc-700 h-11 text-sm font-mono placeholder:text-zinc-600 pr-8"
+                  placeholder="搜索全球股票代码或名称"
+                />
+                {lookingUp && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500 animate-spin" />
                 )}
               </div>
-              <div className="col-span-2 space-y-2">
-                <Label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">市场</Label>
-                <div className="flex rounded-lg bg-zinc-900 border border-zinc-700 p-0.5 h-11">
-                  {marketOptions.map((m) => (
+              {symbolName && !showSearch && !lookingUp && (
+                <p className="text-xs text-emerald-400/80 truncate flex items-center gap-1">
+                  <Check className="h-3 w-3 text-emerald-500" /> {symbolName}
+                  <span className="text-zinc-600 ml-1">({form.market} · {marketCurrency[form.market] || "USD"})</span>
+                </p>
+              )}
+              {/* Search results dropdown */}
+              {showSearch && (
+                <div className="absolute z-50 mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl max-h-64 overflow-y-auto">
+                  {searchResults.map((r, i) => (
                     <button
-                      key={m.value}
+                      key={i}
                       type="button"
-                      onClick={() => setForm({ ...form, market: m.value })}
-                      className={`flex-1 text-xs rounded-md transition-colors ${
-                        form.market === m.value
-                          ? "bg-zinc-700 text-white"
-                          : "text-zinc-500 hover:text-zinc-300"
-                      }`}
+                      className="w-full text-left px-3 py-2.5 hover:bg-zinc-800 border-b border-zinc-800 last:border-0 transition-colors"
+                      onClick={() => selectSearchResult(r)}
                     >
-                      {m.label}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-mono font-semibold text-white text-sm shrink-0">{r.symbol}</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 bg-white/10 text-zinc-400">{r.marketLabel || r.market}</span>
+                          <span className="text-[10px] text-zinc-600">{r.currency}</span>
+                        </div>
+                        {r.price && <span className="text-xs text-zinc-400 font-mono shrink-0 ml-2">{r.price.toFixed(2)}</span>}
+                      </div>
+                      <p className="text-xs text-zinc-400 truncate mt-0.5">{r.name}{r.exchange ? ` · ${r.exchange}` : ""}</p>
                     </button>
                   ))}
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Type */}
@@ -275,7 +255,7 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
               </div>
               <div className="space-y-2">
                 <Label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                  价格 ({selectedMarket?.hint})
+                  价格 ({priceLabel})
                 </Label>
                 <Input
                   value={form.price}
@@ -319,7 +299,7 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
                 <span className="text-sm text-zinc-400">预估总额</span>
                 <span className="text-sm font-mono font-semibold">
                   <TypeIcon className={`h-3.5 w-3.5 inline mr-1 ${selectedType?.color}`} />
-                  {selectedMarket?.hint} {estimatedTotal}
+                  {priceLabel} {estimatedTotal}
                 </span>
               </div>
             )}
