@@ -1,32 +1,51 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Upload, FileText } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Upload, FileText, Download } from "lucide-react";
 import { toast } from "sonner";
+
+interface Account {
+  id: string;
+  name: string;
+  currency: string;
+}
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  accounts: Account[];
   onDone?: () => void;
 }
 
-export function ImportSheet({ open, onOpenChange, onDone }: Props) {
+export function ImportSheet({ open, onOpenChange, accounts, onDone }: Props) {
   const [file, setFile] = useState<File | null>(null);
+  const [accountId, setAccountId] = useState("");
   const [importing, setImporting] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
+  const handleFile = useCallback((f: File | null) => {
+    if (f) setFile(f);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const f = e.dataTransfer.files?.[0];
     if (f) setFile(f);
   }, []);
 
   const handleImport = async () => {
-    if (!file) return;
+    if (!file || !accountId) return;
     setImporting(true);
     try {
       const formData = new FormData();
       formData.append("file", file);
+      formData.append("accountId", accountId);
       const res = await fetch("/api/transactions/import", { method: "POST", body: formData });
       const data = await res.json() as { count?: number; error?: string };
       if (data.count !== undefined) {
@@ -40,6 +59,7 @@ export function ImportSheet({ open, onOpenChange, onDone }: Props) {
     }
     setImporting(false);
     setFile(null);
+    setAccountId("");
     onOpenChange(false);
   };
 
@@ -50,7 +70,34 @@ export function ImportSheet({ open, onOpenChange, onDone }: Props) {
           <SheetTitle className="text-zinc-100">导入交易记录</SheetTitle>
         </SheetHeader>
         <div className="space-y-4 mt-6">
-          <div className="border-2 border-dashed border-zinc-700 rounded-lg p-10 text-center">
+          {/* Account selector */}
+          <div className="space-y-2">
+            <Label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">导入到账户</Label>
+            <Select value={accountId} onValueChange={(v) => v && setAccountId(v)}>
+              <SelectTrigger className="bg-zinc-900 border-zinc-700 h-10 text-sm">
+                <SelectValue placeholder="选择账户..." />
+              </SelectTrigger>
+              <SelectContent>
+                {accounts.length === 0 ? (
+                  <div className="px-2 py-4 text-sm text-zinc-500 text-center">暂无账户，请先在设置中添加</div>
+                ) : (
+                  accounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>{a.name} ({a.currency})</SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* File drop zone */}
+          <div
+            className={`border-2 border-dashed rounded-lg p-10 text-center transition-colors ${
+              dragOver ? "border-emerald-400 bg-emerald-400/5" : "border-zinc-700"
+            }`}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+          >
             {file ? (
               <div className="flex flex-col items-center gap-2">
                 <FileText className="h-8 w-8 text-emerald-400" />
@@ -65,17 +112,26 @@ export function ImportSheet({ open, onOpenChange, onDone }: Props) {
                 <p className="text-xs text-zinc-600 mt-1">或</p>
                 <label className="mt-2 inline-block cursor-pointer text-sm text-emerald-400 hover:text-emerald-300">
                   浏览文件
-                  <input type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleFile} />
+                  <input type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={(e) => handleFile(e.target.files?.[0] ?? null)} />
                 </label>
               </>
             )}
           </div>
 
-          <div className="text-xs text-zinc-500">
-            支持列名：<code className="text-zinc-400">代码/代码, 类型, 数量, 价格, 手续费, 日期</code>
+          {/* CSV format hint + template download */}
+          <div className="flex items-center justify-between text-xs text-zinc-500">
+            <span>列：符号, 类型, 数量, 价格, 手续费, 日期, 市场</span>
+            <a
+              href="data:text/csv;charset=utf-8,symbol,type,quantity,price,fee,date,market%0AAAPL,buy,10,150,0.5,2025-01-01,US"
+              download="template.csv"
+              className="flex items-center gap-1 text-emerald-400 hover:text-emerald-300"
+            >
+              <Download className="h-3 w-3" />
+              模板
+            </a>
           </div>
 
-          <Button onClick={handleImport} disabled={!file || importing} className="w-full">
+          <Button onClick={handleImport} disabled={!file || !accountId || importing} className="w-full">
             {importing ? "导入中..." : "开始导入"}
           </Button>
         </div>

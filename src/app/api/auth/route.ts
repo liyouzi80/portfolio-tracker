@@ -128,8 +128,12 @@ export async function POST(req: NextRequest) {
     return res;
   }
 
-  // --- Delete Passkey ---
+  // --- Delete Passkey (requires active session) ---
   if (body.action === "delete-passkey") {
+    const token = getCookieFromRequest(req as any);
+    if (!token || !(await verifySessionToken(token))) {
+      return NextResponse.json({ error: "请先登录" }, { status: 401 });
+    }
     await DB.prepare("DELETE FROM auth WHERE key = 'passkeyHash'").run();
     return NextResponse.json({ success: true });
   }

@@ -46,6 +46,7 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
   });
   const [symbolName, setSymbolName] = useState("");
   const [lookingUp, setLookingUp] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const lookupTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const resetForm = () => {
@@ -86,9 +87,10 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
 
   const selectedAccount = accounts.find(a => a.id === form.accountId);
 
-  const handleSubmit = () => {
-    if (!form.accountId || !form.symbol || !form.quantity || !form.price) return;
-    onSave({
+  const handleSubmit = async () => {
+    if (!form.accountId || !form.symbol || !form.quantity || !form.price || submitting) return;
+    setSubmitting(true);
+    await onSave({
       accountId: form.accountId,
       symbol: form.symbol.toUpperCase(),
       market: form.market,
@@ -98,6 +100,7 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
       fee: parseFloat(form.fee || "0"),
       date: form.date,
     });
+    setSubmitting(false);
     resetForm();
     onOpenChange(false);
   };
@@ -270,8 +273,8 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
             )}
 
             {/* Submit */}
-            <Button onClick={handleSubmit} disabled={!isValid} className="w-full h-11 text-sm font-medium">
-              保存交易
+            <Button onClick={handleSubmit} disabled={!isValid || submitting} className="w-full h-11 text-sm font-medium">
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "保存交易"}
             </Button>
             {!isValid && (
               <p className="text-xs text-amber-400/80 text-center">

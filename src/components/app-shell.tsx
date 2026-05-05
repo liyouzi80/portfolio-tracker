@@ -19,14 +19,16 @@ export function AppShell() {
 
   const handleUnlock = useCallback(() => setUnlocked(true), []);
 
-  const handleLogout = useCallback(async () => {
-    await fetch("/api/auth", {
+  const handleLogout = useCallback(() => {
+    if (!confirm("确认退出登录？")) return;
+    fetch("/api/auth", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "logout" }),
-    });
-    setUnlocked(false);
-    toast.success("已退出登录");
+    }).then(() => {
+      setUnlocked(false);
+      toast.success("已退出登录");
+    }).catch(() => toast.error("退出失败"));
   }, []);
 
   if (!unlocked) {

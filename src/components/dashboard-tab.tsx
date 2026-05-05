@@ -38,7 +38,7 @@ interface PortfolioData {
 
 const currencySymbols: Record<string, string> = { CNY: "¥", USD: "$", HKD: "HK$" };
 const marketLabels: Record<string, string> = { US: "美股", HK: "港股", CN: "A股" };
-const marketColors: Record<string, string> = { US: "#3b82f6", HK: "#f59e0b", CN: "#ef4444" };
+const marketColors: Record<string, string> = { US: "#6366f1", HK: "#8b5cf6", CN: "#06b6d4" };
 
 function MetricCard({ label, value, sub, accent, delay }: { label: string; value: string; sub?: string; accent?: boolean; delay: number }) {
   return (

@@ -1,27 +1,18 @@
 import { SignJWT, jwtVerify } from "jose";
 
-// Use env secret or generate a random one (changes on restart, invalidating all sessions)
-// In production, always set JWT_SECRET env var for persistent sessions
-function getEnvSecretKey(): Uint8Array | null {
-  try {
-    if (typeof process !== "undefined" && process.env?.JWT_SECRET) {
-      return new TextEncoder().encode(process.env.JWT_SECRET);
-    }
-  } catch { /* process or process.env not available */ }
-  return null;
+// JWT_SECRET is mandatory in production. Workers Isolate restarts
+// invalidate in-memory fallback keys, causing random session loss.
+function getEnvSecretKey(): Uint8Array {
+  if (typeof process !== "undefined" && process.env?.JWT_SECRET) {
+    return new TextEncoder().encode(process.env.JWT_SECRET);
+  }
+  throw new Error("JWT_SECRET environment variable is required. Set it via wrangler secret put JWT_SECRET or GitHub Secrets.");
 }
-const SECRET_KEY = getEnvSecretKey();
 
 const COOKIE_NAME = "pt-session";
 
-// Initialize dev secret once per cold start
-if (!SECRET_KEY) {
-  (globalThis as any).__PT_SECRET__ = (globalThis as any).__PT_SECRET__
-    || Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
 function getKey(): Uint8Array {
-  return SECRET_KEY || new TextEncoder().encode((globalThis as any).__PT_SECRET__);
+  return getEnvSecretKey();
 }
 
 export async function createSessionToken(): Promise<string> {

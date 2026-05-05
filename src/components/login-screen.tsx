@@ -155,6 +155,7 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
       {/* Bing Background */}
+      <div className="absolute inset-0 bg-zinc-900" />
       <div
         className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000"
         style={{ backgroundImage: bgUrl ? `url(${bgUrl})` : 'none', opacity: bgLoaded ? 1 : 0 }}

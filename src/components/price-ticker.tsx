@@ -9,36 +9,30 @@ interface TickerItem {
   change: number | null;
 }
 
-const referenceSymbols = [
-  { symbol: "AAPL", market: "US" },
-  { symbol: "0700", market: "HK" },
-  { symbol: "600519", market: "CN" },
-  { symbol: "TSLA", market: "US" },
-  { symbol: "SPY", market: "US" },
-];
-
-const fallbackData: TickerItem[] = referenceSymbols.map((s) => ({
-  symbol: s.symbol,
-  price: null,
-  change: null,
-}));
-
 export function PriceTicker() {
-  const [items, setItems] = useState<TickerItem[]>(fallbackData);
+  const [items, setItems] = useState<TickerItem[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    Promise.all(
-      referenceSymbols.map(async ({ symbol, market }) => {
-        try {
-          const res = await fetch(`/api/price?symbol=${symbol}&market=${market}`);
-          const data = await res.json() as { price?: number | null };
-          return { symbol, price: data.price ?? null, change: null };
-        } catch {
-          return { symbol, price: null, change: null };
-        }
+    // Load prices for portfolio holdings
+    fetch("/api/portfolio?baseCurrency=CNY")
+      .then(r => r.json() as Promise<{ holdings: Array<{ symbol: string; market: string }> }>)
+      .then(d => {
+        const symbols = d.holdings?.length
+          ? [...new Map(d.holdings.map(h => [h.symbol, h])).values()]
+          : [{ symbol: "SPY", market: "US" }]; // fallback
+        return Promise.all(symbols.map(async ({ symbol, market }) => {
+          try {
+            const res = await fetch(`/api/price?symbol=${symbol}&market=${market}`);
+            const data = await res.json() as { price?: number | null };
+            return { symbol, price: data.price ?? null, change: null };
+          } catch {
+            return { symbol, price: null, change: null };
+          }
+        }));
       })
-    ).then(setItems);
+      .then(setItems)
+      .catch(() => {});
   }, []);
 
   return (

@@ -55,6 +55,7 @@ export function SettingsTab() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [accountOpen, setAccountOpen] = useState(false);
   const [alertOpen, setAlertOpen] = useState(false);
+  const [editAccount, setEditAccount] = useState<Account | null>(null);
   const [dataSource, setDataSource] = useState("yahoo");
   const [testing, setTesting] = useState(false);
   const [registeringPasskey, setRegisteringPasskey] = useState(false);
@@ -94,34 +95,49 @@ export function SettingsTab() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  const handleAddAccount = async (acc: { name: string; currency: string; leverage: number }) => {
-    try {
-      const res = await fetch("/api/accounts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(acc),
-      });
-      const data = await res.json() as { id?: string; error?: string };
-      if (data.id) {
-        setAccounts([...accounts, { id: data.id, ...acc }]);
-        toast.success("账户已添加");
-      } else {
-        toast.error(data.error || "添加失败");
-      }
-    } catch { toast.error("网络错误"); }
+  const handleSaveAccount = async (acc: { name: string; currency: string; leverage: number; id?: string }) => {
+    if (acc.id) {
+      // Edit existing
+      try {
+        const res = await fetch(`/api/accounts/${acc.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: acc.name, currency: acc.currency, leverage: acc.leverage }),
+        });
+        const data = await res.json() as { success?: boolean; error?: string };
+        if (data.success) {
+          setAccounts(accounts.map(a => a.id === acc.id ? { ...a, name: acc.name, currency: acc.currency, leverage: acc.leverage } : a));
+          toast.success("账户已更新");
+        } else { toast.error(data.error || "更新失败"); }
+      } catch { toast.error("网络错误"); }
+    } else {
+      // Create new
+      try {
+        const res = await fetch("/api/accounts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(acc),
+        });
+        const data = await res.json() as { id?: string; error?: string };
+        if (data.id) {
+          setAccounts([...accounts, { id: data.id, name: acc.name, currency: acc.currency, leverage: acc.leverage }]);
+          toast.success("账户已添加");
+        } else { toast.error(data.error || "添加失败"); }
+      } catch { toast.error("网络错误"); }
+    }
+    setEditAccount(null);
   };
 
   const handleDeleteAccount = async (id: string) => {
+    if (!confirm("确认删除此账户？关联的交易记录将无法显示。")) return;
+    const prev = accounts;
+    setAccounts(accounts.filter((a) => a.id !== id));
     try {
       const res = await fetch(`/api/accounts?id=${id}`, { method: "DELETE" });
       const data = await res.json() as { success?: boolean; error?: string };
-      if (data.success) {
-        setAccounts(accounts.filter((a) => a.id !== id));
-        toast.success("账户已删除");
-      } else {
-        toast.error(data.error || "删除失败");
-      }
-    } catch { toast.error("网络错误"); }
+      if (data.success) { toast.success("账户已删除"); }
+      else { setAccounts(prev); toast.error(data.error || "删除失败"); }
+    } catch { setAccounts(prev); toast.error("网络错误"); }
   };
 
   const handleAddAlert = async (a: { symbol: string; condition: string; threshold: number }) => {
@@ -228,7 +244,7 @@ export function SettingsTab() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-medium">账户管理</CardTitle>
-            <Button size="sm" variant="outline" className="border-zinc-700 text-zinc-300" onClick={() => setAccountOpen(true)}>
+            <Button size="sm" variant="outline" className="border-zinc-700 text-zinc-300" onClick={() => { setEditAccount(null); setAccountOpen(true); }}>
               <Plus className="h-4 w-4 mr-1" />添加
             </Button>
           </div>
@@ -254,7 +270,7 @@ export function SettingsTab() {
                     <TableCell className="font-mono">{a.leverage}x</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-500 hover:text-zinc-300">
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-500 hover:text-zinc-300" onClick={() => { setEditAccount(a); setAccountOpen(true); }}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-500 hover:text-red-400" onClick={() => handleDeleteAccount(a.id)}>
@@ -401,7 +417,7 @@ export function SettingsTab() {
         </CardContent>
       </Card>
 
-      <AccountSheet open={accountOpen} onOpenChange={setAccountOpen} onSave={handleAddAccount} />
+      <AccountSheet open={accountOpen} onOpenChange={setAccountOpen} onSave={handleSaveAccount} editAccount={editAccount} />
       <AlertSheet open={alertOpen} onOpenChange={setAlertOpen} onSave={handleAddAlert} />
       </>
       )}

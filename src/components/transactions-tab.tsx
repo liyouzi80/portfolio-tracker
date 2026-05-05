@@ -68,12 +68,15 @@ export function TransactionsTab() {
   }, [loadTxns]);
 
   const handleDelete = async (id: string) => {
+    if (!confirm("确认删除这条交易记录？此操作不可撤销。")) return;
     setDeleting(id);
+    const prevTxns = txns;
+    setTxns((p) => p.filter((t) => t.id !== id));
     try {
       await fetch(`/api/transactions?id=${id}`, { method: "DELETE" });
-      setTxns((prev) => prev.filter((t) => t.id !== id));
       toast.success("交易记录已删除");
     } catch {
+      setTxns(prevTxns);
       toast.error("删除失败");
     }
     setDeleting(null);
@@ -227,7 +230,7 @@ export function TransactionsTab() {
       </CardContent>
 
       <TransactionSheet open={sheetOpen} onOpenChange={setSheetOpen} accounts={accounts} onSave={handleSaveTxn} />
-      <ImportSheet open={importOpen} onOpenChange={setImportOpen} onDone={handleImportDone} />
+      <ImportSheet open={importOpen} onOpenChange={setImportOpen} accounts={accounts} onDone={handleImportDone} />
     </Card>
   );
 }
