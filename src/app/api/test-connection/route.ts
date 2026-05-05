@@ -10,6 +10,7 @@ export async function POST(req: NextRequest) {
   const lbToken = accessToken || (typeof process !== "undefined" && process.env?.LONGPORT_ACCESS_TOKEN) || (typeof process !== "undefined" && process.env?.LONGBRIDGE_ACCESS_TOKEN);
 
   const longbridgeConfigured = !!(lbKey && lbSecret && lbToken);
+  let lbResult: { price?: number; error?: string } = {};
 
   // Try Longbridge if credentials available
   if (longbridgeConfigured) {
@@ -22,34 +23,28 @@ export async function POST(req: NextRequest) {
       if (price !== null) {
         return NextResponse.json({ success: true, price, symbol: "AAPL.US", source: "longbridge" });
       }
-      return NextResponse.json({
-        success: false,
-        error: "长桥 API 连接成功但未返回 AAPL 价格，请检查 API 权限是否包含实时行情",
-        source: "longbridge",
-      });
+      lbResult = { error: "认证通过但 AAPL 行情数据为空，可能是账户未开通美股实时行情权限" };
     } catch (e: any) {
-      return NextResponse.json({
-        success: false,
-        error: `长桥 API 请求失败: ${e.message || "未知错误"}`,
-        source: "longbridge",
-      });
+      lbResult = { error: `请求失败: ${e.message || "未知错误"}` };
     }
   }
 
-  // No Longbridge creds — test Yahoo instead
+  // Always test Yahoo as verification
   const yahooPrice = await fetchYahooPrice("AAPL", "US");
-  if (yahooPrice !== null) {
-    return NextResponse.json({
-      success: true,
-      price: yahooPrice,
-      symbol: "AAPL.US",
-      source: "yahoo",
-      note: "长桥凭证未配置，使用 Yahoo Finance",
-    });
-  }
+  const yahooOk = yahooPrice !== null;
 
   return NextResponse.json({
-    success: false,
-    error: "长桥凭证未配置，且 Yahoo Finance 也无法获取价格，请检查网络",
+    success: yahooOk,
+    price: yahooPrice ?? undefined,
+    symbol: "AAPL.US",
+    source: yahooOk ? "yahoo" : "none",
+    longbridge: longbridgeConfigured ? {
+      configured: true,
+      ok: false,
+      error: lbResult.error || "未返回价格",
+    } : { configured: false },
+    note: longbridgeConfigured
+      ? (lbResult.error || "长桥已配置但无数据") + "。Yahoo Finance " + (yahooOk ? "连接正常" : "也失败")
+      : "长桥未配置，使用 Yahoo Finance" + (yahooOk ? "" : " (失败)"),
   });
 }

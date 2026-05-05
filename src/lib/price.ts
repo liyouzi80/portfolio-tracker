@@ -115,9 +115,11 @@ export async function fetchLongbridgePrice(symbol: string, market: string, creds
         "User-Agent": "openapi-sdk",
       },
     });
-    if (!res.ok) throw new Error(`Longbridge API error: ${res.status}`);
-    const data = await res.json() as { lastDone?: number; lastPrice?: number };
-    return data?.lastDone ?? data?.lastPrice ?? null;
+    if (!res.ok) throw new Error(`Longbridge HTTP ${res.status}`);
+    const raw = await res.json() as Record<string, unknown>;
+    // Server returns snake_case; also check camelCase (SDK convention)
+    const price = raw.last_done ?? raw.lastDone ?? raw.last_price ?? raw.lastPrice ?? raw.price;
+    return typeof price === "number" ? price : null;
   } catch {
     return null;
   }

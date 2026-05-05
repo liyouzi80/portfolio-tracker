@@ -219,11 +219,17 @@ export function SettingsTab() {
     setTesting(true);
     try {
       const res = await fetch("/api/test-connection", { method: "POST" });
-      const data = await res.json() as { success: boolean; price?: number; symbol?: string; source?: string; note?: string; error?: string };
+      const data = await res.json() as { success: boolean; price?: number; symbol?: string; source?: string; note?: string; longbridge?: { configured: boolean; ok: boolean; error?: string } };
       if (data.success && data.price) {
-        toast.success(`${data.symbol} = $${data.price} (${data.source === "yahoo" ? "Yahoo Finance" : "长桥"})`);
+        if (data.source === "longbridge") {
+          toast.success(`长桥: ${data.symbol} = $${data.price}`);
+        } else if (data.longbridge?.configured) {
+          toast.warning(`长桥: ${data.longbridge.error}\nYahoo 备用: $${data.price}`);
+        } else {
+          toast.success(`Yahoo Finance: ${data.symbol} = $${data.price}`);
+        }
       } else {
-        toast.error(data.error || "测试失败");
+        toast.error(data.note || "测试失败");
       }
     } catch {
       toast.error("测试失败: 网络错误");
