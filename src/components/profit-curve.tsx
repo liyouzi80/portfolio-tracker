@@ -57,11 +57,14 @@ const periodSeeds: Record<Period, number> = {
 export function ProfitCurve({ baseValue }: { baseValue: number }) {
   const [period, setPeriod] = useState<Period>("3m");
 
-  // Use key to keep the chart stable on period switch (useMemo tracks deps)
   const data = useMemo(
-    () => generateData(periodDays[period], baseValue || 285000, periodSeeds[period]),
+    () => generateData(periodDays[period], baseValue, periodSeeds[period]),
     [period, baseValue],
   );
+
+  if (data.length === 0) {
+    return <p className="text-zinc-500 text-sm text-center py-12">暂无盈亏数据</p>;
+  }
 
   return (
     <div>

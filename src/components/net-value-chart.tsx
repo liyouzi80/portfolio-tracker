@@ -25,7 +25,7 @@ function generateNetValue(days: number, baseValue: number) {
 }
 
 export function NetValueChart({ baseValue }: { baseValue: number }) {
-  const data = useMemo(() => generateNetValue(90, baseValue || 250000), [baseValue]);
+  const data = useMemo(() => generateNetValue(90, baseValue), [baseValue]);
 
   if (data.length === 0) {
     return <p className="text-zinc-500 text-sm text-center py-12">暂无净值数据</p>;
