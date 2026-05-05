@@ -177,7 +177,7 @@ export function TransactionsTab() {
         ) : (
           <div className="overflow-x-auto"><Table>
             <TableHeader>
-              <TableRow className="border-zinc-800 hover:bg-transparent">
+              <TableRow className="border-zinc-800 ">
                 <TableHead className="text-zinc-500">日期</TableHead>
                 <TableHead className="text-zinc-500">账户</TableHead>
                 <TableHead className="text-zinc-500">代码</TableHead>

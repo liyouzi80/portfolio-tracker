@@ -4,7 +4,8 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Label } from "rechar
 
 interface AllocationItem { name: string; value: number; color: string }
 
-export function AllocationPie({ data }: { data: AllocationItem[] }) {
+export function AllocationPie({ data, currency }: { data: AllocationItem[]; currency?: string }) {
+  const cs = currency || "¥";
   if (data.length === 0) {
     return <p className="text-zinc-500 text-sm text-center py-8">暂无持仓数据</p>;
   }
@@ -24,8 +25,8 @@ export function AllocationPie({ data }: { data: AllocationItem[] }) {
             <Label value={`${data.length} 个市场`} position="center" fill="#a1a1aa" fontSize={12} />
           </Pie>
           <Tooltip
-            contentStyle={{ background: "#18181b", border: "1px solid #27272a", borderRadius: "8px", fontSize: "13px" }}
-            formatter={(v, name) => [`¥${Number(v).toLocaleString()}`, name]}
+            contentStyle={{ background: "rgba(24,24,27,0.95)", border: "1px solid rgba(63,63,70,0.5)", borderRadius: "8px", fontSize: "13px", color: "#fff" }}
+            formatter={(v, name) => [`${cs}${Number(v).toLocaleString()}`, name]}
           />
         </PieChart>
       </ResponsiveContainer>

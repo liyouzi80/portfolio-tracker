@@ -143,7 +143,7 @@ export function SettingsTab() {
 
   const handleAddAlert = async (a: { symbol: string; condition: string; threshold: number }) => {
     try {
-      const market = /^\d/.test(a.symbol) ? "CN" : /\.HK$/i.test(a.symbol) ? "HK" : "US";
+      const market = /^\d{4,6}$/.test(a.symbol) ? (/^6/.test(a.symbol) ? "CN" : "HK") : "US";
       const res = await fetch("/api/alerts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -270,7 +270,7 @@ export function SettingsTab() {
           ) : (
             <div className="overflow-x-auto"><Table>
               <TableHeader>
-                <TableRow className="border-zinc-800 hover:bg-transparent">
+                <TableRow className="border-zinc-800 ">
                   <TableHead className="text-zinc-500">账户名称</TableHead>
                   <TableHead className="text-zinc-500">币种</TableHead>
                   <TableHead className="text-zinc-500">杠杆</TableHead>
@@ -317,7 +317,7 @@ export function SettingsTab() {
           ) : (
             <div className="overflow-x-auto"><Table>
               <TableHeader>
-                <TableRow className="border-zinc-800 hover:bg-transparent">
+                <TableRow className="border-zinc-800 ">
                   <TableHead className="text-zinc-500">代码</TableHead>
                   <TableHead className="text-zinc-500">条件</TableHead>
                   <TableHead className="text-zinc-500">阈值</TableHead>

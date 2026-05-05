@@ -129,8 +129,12 @@ export async function POST(req: NextRequest) {
     return res;
   }
 
-  // --- Save Settings ---
+  // --- Save Settings (requires active session) ---
   if (body.action === "save-settings") {
+    const token = getCookieFromRequest(req as any);
+    if (!token || !(await verifySessionToken(token))) {
+      return NextResponse.json({ error: "请先登录" }, { status: 401 });
+    }
     if (body.dataSource) await setValue(DB, "dataSource", body.dataSource);
     return NextResponse.json({ success: true });
   }

@@ -20,16 +20,16 @@ interface Holding {
 const marketLabels: Record<string, string> = { US: "美股", HK: "港股", CN: "A股" };
 
 const marketColors: Record<string, string> = {
-  US: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  HK: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-  CN: "bg-red-500/10 text-red-400 border-red-500/20",
+  US: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
+  HK: "bg-violet-500/10 text-violet-400 border-violet-500/20",
+  CN: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
 };
 
 export function HoldingsTable({ data }: { data: Holding[] }) {
   return (
     <div className="overflow-x-auto"><Table>
       <TableHeader>
-        <TableRow className="border-zinc-800 hover:bg-transparent">
+        <TableRow className="border-zinc-800 ">
           <TableHead className="text-zinc-500">代码</TableHead>
           <TableHead className="text-zinc-500">名称</TableHead>
           <TableHead className="text-zinc-500">市场</TableHead>

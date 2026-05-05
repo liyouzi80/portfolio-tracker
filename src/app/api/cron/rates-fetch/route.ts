@@ -21,8 +21,9 @@ async function fetchWithRetry(url: string, retries = 3): Promise<Response> {
 }
 
 export async function GET(req: NextRequest) {
-  const secret = typeof process !== "undefined" && process.env?.CRON_SECRET;
-  if (secret && req.nextUrl.searchParams.get("secret") !== secret) {
+  const env = getPlatformEnv() as unknown as Record<string, string | undefined>;
+  const cronSecret = env?.CRON_SECRET;
+  if (cronSecret && req.nextUrl.searchParams.get("secret") !== cronSecret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

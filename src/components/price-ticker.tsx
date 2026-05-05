@@ -41,7 +41,7 @@ export function PriceTicker() {
 
   return (
     <div className="border-b border-zinc-800 bg-zinc-900/80 overflow-hidden">
-      <div className="marquee-container flex whitespace-nowrap animate-[marquee_30s_linear_infinite]" ref={scrollRef}>
+      <div className="marquee-container flex whitespace-nowrap animate-[marquee_30s_linear_infinite] hover:[animation-play-state:paused]" ref={scrollRef}>
         {[...items, ...items].map((item, i) => (
           <div key={`${item.symbol}-${i}`} className="inline-flex items-center gap-2 px-4 py-2 text-sm">
             <span className="font-mono font-medium">{item.symbol}</span>

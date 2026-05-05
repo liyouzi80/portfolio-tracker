@@ -12,11 +12,17 @@ export async function POST(req: NextRequest) {
   const formData = await req.formData();
   const file = formData.get("file") as File;
   if (!file) return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+  if (file.size > 5 * 1024 * 1024) return NextResponse.json({ error: "文件大小不能超过 5MB" }, { status: 400 });
+
+  const accountId = formData.get("accountId") as string;
+  if (!accountId) return NextResponse.json({ error: "请选择导入账户" }, { status: 400 });
 
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
+  if (!workbook.SheetNames.length) return NextResponse.json({ error: "文件中没有工作表" }, { status: 400 });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json<Record<string, string>>(sheet);
+  if (!rows.length) return NextResponse.json({ error: "工作表中没有数据行" }, { status: 400 });
 
   const imported = [];
   for (const row of rows) {

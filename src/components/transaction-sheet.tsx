@@ -123,7 +123,9 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
     resetForm();
   };
 
-  const isValid = form.accountId && form.symbol && form.quantity && form.price;
+  const qty = parseFloat(form.quantity);
+  const prc = parseFloat(form.price);
+  const isValid = !!(form.accountId && form.symbol && !isNaN(qty) && qty > 0 && !isNaN(prc) && prc > 0);
   const estimatedTotal = form.quantity && form.price
     ? (parseFloat(form.quantity) * parseFloat(form.price) + parseFloat(form.fee || "0")).toFixed(2)
     : "";

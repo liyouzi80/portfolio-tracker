@@ -50,17 +50,19 @@ const currencySymbols: Record<string, string> = { CNY: "¥", USD: "$", HKD: "HK$
 const marketLabels: Record<string, string> = { US: "美股", HK: "港股", CN: "A股" };
 const marketColors: Record<string, string> = { US: "#6366f1", HK: "#8b5cf6", CN: "#06b6d4" };
 
-function MetricCard({ label, value, sub, accent, delay }: { label: string; value: string; sub?: string; accent?: boolean; delay: number }) {
+function MetricCard({ label, value, sub, color, delay }: { label: string; value: string; sub?: string; color?: "green" | "red" | "neutral"; delay: number }) {
+  const colorClass = color === "green" ? "text-emerald-400" : color === "red" ? "text-red-400" : "";
+  const subClass = color === "green" ? "text-emerald-500/70" : color === "red" ? "text-red-500/70" : "text-zinc-600";
   return (
     <Card className={`stagger-${delay} t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]`}>
       <CardHeader className="pb-2">
         <CardTitle className="text-xs font-normal tracking-wide text-zinc-500 uppercase">{label}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className={`text-2xl font-bold tracking-tight font-mono tabular-nums ${accent ? 'text-emerald-400' : ''}`}>
+        <div className={`text-2xl font-bold tracking-tight font-mono tabular-nums ${colorClass}`}>
           {value}
         </div>
-        {sub && <div className={`text-xs mt-1 font-mono ${accent ? 'text-emerald-500/70' : 'text-zinc-600'}`}>{sub}</div>}
+        {sub && <div className={`text-xs mt-1 font-mono ${subClass}`}>{sub}</div>}
       </CardContent>
     </Card>
   );
@@ -131,11 +133,11 @@ export function DashboardTab({ visible }: { visible: boolean }) {
     <div className="space-y-5">
       {/* Row 1: Overall metric cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-3">
-        <MetricCard label="总资产" value={`${cs}${totalMarketValue.toLocaleString()}`} sub={`成本 ${cs}${totalValue.toLocaleString()}`} delay={1} />
-        <MetricCard label="今日盈亏" value={todayPnl !== 0 ? `${pnlSign}${cs}${Math.abs(todayPnl).toLocaleString()}` : "--"} sub={todayPnl !== 0 ? "基于最新价格" : "价格数据更新中"} delay={2} />
-        <MetricCard label="持仓盈亏" value={totalPnl !== 0 ? `${pnlSign}${cs}${Math.abs(totalPnl).toLocaleString()}` : "--"} sub={totalPnl !== 0 ? "浮动盈亏" : "添加价格数据后计算"} accent delay={3} />
+        <MetricCard label="总资产" value={`${cs}${totalMarketValue.toLocaleString()}`} sub={`成本 ${cs}${totalValue.toLocaleString()}`} color="neutral" delay={1} />
+        <MetricCard label="今日盈亏" value={todayPnl !== 0 ? `${pnlSign}${cs}${Math.abs(todayPnl).toLocaleString()}` : "--"} sub={todayPnl !== 0 ? "基于最新价格" : "价格数据更新中"} color={todayPnl > 0 ? "green" : todayPnl < 0 ? "red" : "neutral"} delay={2} />
+        <MetricCard label="持仓盈亏" value={totalPnl !== 0 ? `${pnlSign}${cs}${Math.abs(totalPnl).toLocaleString()}` : "--"} sub={totalPnl !== 0 ? "浮动盈亏" : "添加价格数据后计算"} color={totalPnl > 0 ? "green" : totalPnl < 0 ? "red" : "neutral"} delay={3} />
         <MetricCard label="持仓数量" value={holdingsCount.toString()} sub={`${marketCount} 个市场`} delay={4} />
-        <MetricCard label="今日估值" value={`${cs}${totalMarketValue.toLocaleString()}`} sub="基于最新行情" delay={5} />
+        <MetricCard label="今日估值" value={`${cs}${totalMarketValue.toLocaleString()}`} sub="基于最新行情" color="neutral" delay={5} />
       </div>
 
       {/* Row 1.5: Per-account totals */}
@@ -181,7 +183,7 @@ export function DashboardTab({ visible }: { visible: boolean }) {
             <CardTitle className="text-sm font-medium tracking-wide">资产配置</CardTitle>
           </CardHeader>
           <CardContent>
-            <AllocationPie data={allocationData} />
+            <AllocationPie data={allocationData} currency={cs} />
           </CardContent>
         </Card>
       </div>

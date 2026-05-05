@@ -7,8 +7,9 @@ import { eq, desc } from "drizzle-orm";
 import { cuid } from "@/lib/cuid";
 
 export async function GET(req: NextRequest) {
-  const secret = typeof process !== "undefined" && process.env?.CRON_SECRET;
-  if (secret && req.nextUrl.searchParams.get("secret") !== secret) {
+  const env2 = getPlatformEnv() as unknown as Record<string, string | undefined>;
+  const cronSecret = env2?.CRON_SECRET;
+  if (cronSecret && req.nextUrl.searchParams.get("secret") !== cronSecret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
