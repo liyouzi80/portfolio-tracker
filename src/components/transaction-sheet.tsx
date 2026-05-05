@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,8 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   accounts: Account[];
-  onSave: (txn: { accountId: string; symbol: string; market: string; type: string; quantity: number; price: number; fee: number; date: string }) => void;
+  onSave: (txn: { accountId: string; symbol: string; market: string; type: string; quantity: number; price: number; fee: number; date: string; id?: string }) => void;
+  editTxn?: { id: string; symbol: string; market: string; type: string; quantity: number; price: number; fee: number; date: string } | null;
 }
 
 const typeOptions = [
@@ -44,7 +45,7 @@ const defaultForm = {
   date: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`,
 };
 
-export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props) {
+export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn }: Props) {
   const [form, setForm] = useState(defaultForm);
   const [symbolName, setSymbolName] = useState("");
   const [lookingUp, setLookingUp] = useState(false);
@@ -53,6 +54,22 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showSearch, setShowSearch] = useState(false);
   const lookupTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useEffect(() => {
+    if (open && editTxn) {
+      setForm({
+        accountId: "",
+        symbol: editTxn.symbol,
+        market: editTxn.market,
+        type: editTxn.type,
+        quantity: String(editTxn.quantity),
+        price: String(editTxn.price),
+        fee: String(editTxn.fee || ""),
+        date: editTxn.date,
+      });
+      setSymbolName(editTxn.symbol);
+    }
+  }, [open, editTxn]);
 
   interface SearchResult { symbol: string; fullSymbol: string; name: string; exchange: string; market: string; currency: string; marketLabel: string; price?: number | null }
 
@@ -109,6 +126,7 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
     if (!form.accountId || !form.symbol || !form.quantity || !form.price || submitting) return;
     setSubmitting(true);
     await onSave({
+      id: editTxn?.id,
       accountId: form.accountId,
       symbol: form.symbol.toUpperCase(),
       market: form.market,
@@ -143,8 +161,8 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
         <div className="px-6 py-6">
           <DialogHeader className="mb-6">
             <DialogTitle className="text-lg font-semibold text-zinc-100 flex items-center gap-2">
-              新增交易
-              {addedCount > 0 && (
+              {editTxn ? "编辑交易" : "新增交易"}
+              {addedCount > 0 && !editTxn && (
                 <span className="text-xs font-normal text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full">
                   已添加 {addedCount} 笔
                 </span>

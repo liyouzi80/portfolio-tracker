@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { TransactionSheet } from "./transaction-sheet";
 import { ImportSheet } from "./import-sheet";
-import { Plus, Upload, Search, Trash2, Loader2 } from "lucide-react";
+import { Plus, Upload, Search, Trash2, Loader2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
 interface Txn { id: string; symbol: string; type: string; quantity: number; price: number; fee: number; date: string; market: string; currency: string; accountName: string }
@@ -22,7 +22,7 @@ const typeColors: Record<string, string> = {
   dividend: "bg-blue-500/10 text-blue-400 border-blue-500/20",
 };
 
-export function TransactionsTab() {
+export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenSheet?: boolean; onSheetClosed?: () => void }) {
   const [txns, setTxns] = useState<Txn[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,6 +30,7 @@ export function TransactionsTab() {
   const [importOpen, setImportOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [editTxn, setEditTxn] = useState<{ id: string; accountId: string; symbol: string; market: string; type: string; quantity: number; price: number; fee: number; date: string } | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
   const loadTxns = useCallback(async () => {
@@ -67,6 +68,30 @@ export function TransactionsTab() {
     }).catch(() => {});
   }, [loadTxns]);
 
+  useEffect(() => {
+    if (autoOpenSheet) setSheetOpen(true);
+  }, [autoOpenSheet]);
+
+  const handleEdit = (t: Txn) => {
+    setEditTxn({
+      id: t.id,
+      accountId: "",
+      symbol: t.symbol,
+      market: t.market,
+      type: t.type,
+      quantity: t.quantity,
+      price: t.price,
+      fee: t.fee,
+      date: t.date,
+    });
+    setSheetOpen(true);
+  };
+
+  const handleSheetChange = (v: boolean) => {
+    setSheetOpen(v);
+    if (!v) { onSheetClosed?.(); setEditTxn(null); }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm("确认删除这条交易记录？此操作不可撤销。")) return;
     setDeleting(id);
@@ -88,8 +113,21 @@ export function TransactionsTab() {
     CH: "CHF", CA: "CAD", AU: "AUD", TW: "TWD", IN: "INR",
   };
 
-  const handleSaveTxn = async (t: { accountId: string; symbol: string; market: string; type: string; quantity: number; price: number; fee: number; date: string }) => {
+  const handleSaveTxn = async (t: { id?: string; accountId: string; symbol: string; market: string; type: string; quantity: number; price: number; fee: number; date: string }) => {
     try {
+      if (t.id) {
+        // Edit existing transaction
+        const res = await fetch(`/api/transactions/${t.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: t.type, quantity: t.quantity, price: t.price, fee: t.fee, date: t.date }),
+        });
+        const data = await res.json() as { success?: boolean; error?: string };
+        if (data.success) { loadTxns(); toast.success("交易已更新"); }
+        else toast.error(data.error || "更新失败");
+        return;
+      }
+
       const currency = marketCurrency[t.market] || "USD";
       // Ensure asset exists
       const assetRes = await fetch("/api/assets", {
@@ -138,7 +176,7 @@ export function TransactionsTab() {
               <Upload className="h-4 w-4 mr-1" />
               导入
             </Button>
-            <Button size="sm" onClick={() => setSheetOpen(true)}>
+            <Button size="sm" onClick={() => { setEditTxn(null); setSheetOpen(true); }}>
               <Plus className="h-4 w-4 mr-1" />
               新增
             </Button>
@@ -207,19 +245,29 @@ export function TransactionsTab() {
                     {t.currency} {(t.quantity * t.price + t.fee).toLocaleString()}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-zinc-500 hover:text-red-400"
-                      disabled={deleting === t.id}
-                      onClick={() => handleDelete(t.id)}
-                    >
-                      {deleting === t.id ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
+                    <div className="flex gap-0.5">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-zinc-500 hover:text-zinc-300"
+                        onClick={() => handleEdit(t)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-zinc-500 hover:text-red-400"
+                        disabled={deleting === t.id}
+                        onClick={() => handleDelete(t.id)}
+                      >
+                        {deleting === t.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -235,7 +283,7 @@ export function TransactionsTab() {
         )}
       </CardContent>
 
-      <TransactionSheet open={sheetOpen} onOpenChange={(v) => { setSheetOpen(v); if (!v) loadTxns(); }} accounts={accounts} onSave={handleSaveTxn} />
+      <TransactionSheet open={sheetOpen} onOpenChange={(v) => { handleSheetChange(v); if (!v) loadTxns(); }} accounts={accounts} onSave={handleSaveTxn} editTxn={editTxn} />
       <ImportSheet open={importOpen} onOpenChange={setImportOpen} accounts={accounts} onDone={handleImportDone} />
     </Card>
   );

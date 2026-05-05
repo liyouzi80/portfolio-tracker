@@ -6,7 +6,9 @@ import { HoldingsTable } from "./holdings-table";
 import { NetValueChart } from "./net-value-chart";
 import { AllocationPie } from "./allocation-pie";
 import { ProfitCurve } from "./profit-curve";
-import { Loader2 } from "lucide-react";
+import { DashboardSkeleton } from "./loading-skeleton";
+import { EmptyState } from "./empty-state";
+import { Plus } from "lucide-react";
 
 interface Holding {
   assetId: string;
@@ -68,7 +70,7 @@ function MetricCard({ label, value, sub, color, delay }: { label: string; value:
   );
 }
 
-export function DashboardTab({ visible }: { visible: boolean }) {
+export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; onAddTransaction?: () => void }) {
   const [data, setData] = useState<PortfolioData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -92,16 +94,16 @@ export function DashboardTab({ visible }: { visible: boolean }) {
     if (visible && !loading) loadData();
   }, [visible]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-6 w-6 text-zinc-500 animate-spin" />
-      </div>
-    );
-  }
+  if (loading) return <DashboardSkeleton />;
 
   if (error || !data) {
-    return <p className="text-zinc-500 text-sm text-center py-20">{error || "暂无数据"}</p>;
+    return (
+      <EmptyState
+        title={error || "暂无数据"}
+        description="添加账户和交易记录后，资产总览将显示在这里"
+        action={onAddTransaction ? <button onClick={onAddTransaction} className="inline-flex items-center gap-1 text-sm text-emerald-400 hover:text-emerald-300"><Plus className="h-4 w-4" />新增交易</button> : undefined}
+      />
+    );
   }
 
   const cs = currencySymbols[data.baseCurrency] ?? data.baseCurrency;
@@ -191,10 +193,17 @@ export function DashboardTab({ visible }: { visible: boolean }) {
       {/* Row 4: Holdings table */}
       <Card className="stagger-8 t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium tracking-wide">持仓明细</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium tracking-wide">持仓明细</CardTitle>
+            {onAddTransaction && (
+              <button onClick={onAddTransaction} className="inline-flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 transition-colors">
+                <Plus className="h-3.5 w-3.5" />新增交易
+              </button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
-          <HoldingsTable data={data.holdings} />
+          <HoldingsTable data={data.holdings} onSymbolClick={(symbol) => onAddTransaction?.()} />
         </CardContent>
       </Card>
     </div>

@@ -25,7 +25,7 @@ const marketColors: Record<string, string> = {
   CN: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
 };
 
-export function HoldingsTable({ data }: { data: Holding[] }) {
+export function HoldingsTable({ data, onSymbolClick }: { data: Holding[]; onSymbolClick?: (symbol: string) => void }) {
   return (
     <div className="overflow-x-auto"><Table>
       <TableHeader>
@@ -42,7 +42,13 @@ export function HoldingsTable({ data }: { data: Holding[] }) {
       <TableBody>
         {data.map((h) => (
           <TableRow key={h.assetId} className="border-zinc-800">
-            <TableCell className="font-mono font-medium">{h.symbol}</TableCell>
+            <TableCell className="font-mono font-medium">
+              {onSymbolClick ? (
+                <button onClick={() => onSymbolClick(h.symbol)} className="hover:text-emerald-400 transition-colors cursor-pointer">
+                  {h.symbol}
+                </button>
+              ) : h.symbol}
+            </TableCell>
             <TableCell className="text-zinc-300">{h.name}</TableCell>
             <TableCell>
               <Badge variant="outline" className={marketColors[h.market] ?? "border-zinc-700"}>

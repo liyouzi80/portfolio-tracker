@@ -14,7 +14,13 @@ import { toast } from "sonner";
 
 export function AppShell() {
   const [tab, setTab] = useState("dashboard");
+  const [openAddSheet, setOpenAddSheet] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
+
+  const handleAddTransaction = useCallback(() => {
+    setTab("transactions");
+    setOpenAddSheet(true);
+  }, []);
   const [isDark, setIsDark] = useState(() => {
     if (typeof window === "undefined") return true;
     return localStorage.getItem("theme") !== "light";
@@ -94,10 +100,10 @@ export function AppShell() {
 
         <main className="px-3 md:px-6 py-4 md:py-6 w-full">
           <TabsContent value="dashboard" className="mt-0">
-            <DashboardTab visible={tab === "dashboard"} />
+            <DashboardTab visible={tab === "dashboard"} onAddTransaction={handleAddTransaction} />
           </TabsContent>
           <TabsContent value="transactions" className="mt-0">
-            <TransactionsTab />
+            <TransactionsTab autoOpenSheet={openAddSheet} onSheetClosed={() => setOpenAddSheet(false)} />
           </TabsContent>
           <TabsContent value="settings" className="mt-0">
             <SettingsTab />
