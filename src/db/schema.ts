@@ -50,6 +50,16 @@ export const alerts = sqliteTable("alerts", {
   triggeredAt: text("triggered_at"),
 });
 
+export const dailySnapshots = sqliteTable("daily_snapshots", {
+  id: text("id").primaryKey(),
+  date: text("date").notNull(), // ISO date YYYY-MM-DD
+  accountId: text("account_id").notNull(),
+  totalCost: real("total_cost").notNull(), // cost basis
+  totalMarketValue: real("total_market_value").notNull(), // marked to market
+  currency: text("currency").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
 export const exchangeRates = sqliteTable("exchange_rates", {
   fromCurrency: text("from_currency").notNull(),
   toCurrency: text("to_currency").notNull(),

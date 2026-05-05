@@ -82,9 +82,15 @@ export function TransactionsTab() {
     setDeleting(null);
   };
 
+  const marketCurrency: Record<string, string> = {
+    US: "USD", HK: "HKD", CN: "CNY", JP: "JPY", KR: "KRW",
+    GB: "GBP", DE: "EUR", FR: "EUR", NL: "EUR", ES: "EUR", IT: "EUR",
+    CH: "CHF", CA: "CAD", AU: "AUD", TW: "TWD", IN: "INR",
+  };
+
   const handleSaveTxn = async (t: { accountId: string; symbol: string; market: string; type: string; quantity: number; price: number; fee: number; date: string }) => {
     try {
-      const currency = t.market === "HK" ? "HKD" : t.market === "CN" ? "CNY" : "USD";
+      const currency = marketCurrency[t.market] || "USD";
       // Ensure asset exists
       const assetRes = await fetch("/api/assets", {
         method: "POST",

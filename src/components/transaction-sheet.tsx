@@ -51,7 +51,7 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
   const [showSearch, setShowSearch] = useState(false);
   const lookupTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  interface SearchResult { symbol: string; fullSymbol: string; name: string; exchange: string; market: string; price?: number | null }
+  interface SearchResult { symbol: string; fullSymbol: string; name: string; exchange: string; market: string; currency: string; marketLabel: string; price?: number | null }
 
   const resetForm = () => {
     setForm({
@@ -94,10 +94,9 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
 
   const selectSearchResult = (item: SearchResult) => {
     setForm({ ...form, symbol: item.symbol, market: item.market });
-    setSymbolName(item.name);
+    setSymbolName(`${item.name} · ${item.marketLabel}`);
     setShowSearch(false);
     setSearchResults([]);
-    // Pre-fill price if available from search
     if (item.price && item.price > 0) {
       setForm(f => ({ ...f, symbol: item.symbol, market: item.market, price: item.price!.toString() }));
     }
@@ -214,13 +213,10 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2 min-w-0">
                             <span className="font-mono font-semibold text-white text-sm shrink-0">{r.symbol}</span>
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${
-                              r.market === "US" ? "bg-blue-500/20 text-blue-400" :
-                              r.market === "HK" ? "bg-amber-500/20 text-amber-400" :
-                              "bg-red-500/20 text-red-400"
-                            }`}>{r.market}</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 bg-white/10 text-zinc-400">{r.marketLabel || r.market}</span>
+                            <span className="text-[10px] text-zinc-600">{r.currency}</span>
                           </div>
-                          {r.price && <span className="text-xs text-zinc-400 font-mono shrink-0 ml-2">${r.price.toFixed(2)}</span>}
+                          {r.price && <span className="text-xs text-zinc-400 font-mono shrink-0 ml-2">{r.price.toFixed(2)}</span>}
                         </div>
                         <p className="text-xs text-zinc-400 truncate mt-0.5">{r.name}{r.exchange ? ` · ${r.exchange}` : ""}</p>
                       </button>

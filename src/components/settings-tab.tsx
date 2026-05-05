@@ -86,8 +86,9 @@ export function SettingsTab() {
         })));
       }
       if (authRes.ok) {
-        const authData = await authRes.json() as { hasPasskey?: boolean };
+        const authData = await authRes.json() as { hasPasskey?: boolean; dataSource?: string };
         setHasPasskey(authData.hasPasskey ?? false);
+        if (authData.dataSource) setDataSource(authData.dataSource);
       }
     } catch { /* ignore */ }
     setLoading(false);
@@ -213,6 +214,18 @@ export function SettingsTab() {
       toast.success("Passkey 已删除");
     } catch { toast.error("删除失败"); }
     setDeletingPasskey(false);
+  };
+
+  const handleSourceChange = async (v: string) => {
+    setDataSource(v);
+    try {
+      await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "save-settings", dataSource: v }),
+      });
+      toast.success(`数据源已切换为 ${v === "tencent" ? "腾讯财经" : v === "longbridge" ? "长桥" : "Yahoo Finance"}`);
+    } catch { /* ignore */ }
   };
 
   const handleTestConnection = async () => {
@@ -394,7 +407,7 @@ export function SettingsTab() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label className="text-zinc-400">主数据源</Label>
-            <Select value={dataSource} onValueChange={(v) => v && setDataSource(v)}>
+            <Select value={dataSource} onValueChange={(v) => v && handleSourceChange(v)}>
               <SelectTrigger className="bg-zinc-900 border-zinc-700">
                 <SelectValue />
               </SelectTrigger>

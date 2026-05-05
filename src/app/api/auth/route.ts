@@ -31,11 +31,12 @@ export async function GET(req: NextRequest) {
   if (valid) return NextResponse.json({ authenticated: true });
 
   const { DB } = getPlatformEnv();
-  const [hash, passkeyHash] = await Promise.all([
+  const [hash, passkeyHash, dataSource] = await Promise.all([
     getValue(DB, "passwordHash"),
     getValue(DB, "passkeyHash"),
+    getValue(DB, "dataSource"),
   ]);
-  return NextResponse.json({ authenticated: false, needsSetup: !hash, hasPasskey: !!passkeyHash });
+  return NextResponse.json({ authenticated: false, needsSetup: !hash, hasPasskey: !!passkeyHash, dataSource: dataSource || "tencent" });
 }
 
 export async function POST(req: NextRequest) {
@@ -126,6 +127,12 @@ export async function POST(req: NextRequest) {
     const res = NextResponse.json({ success: true });
     res.headers.set("Set-Cookie", getSessionCookie(token));
     return res;
+  }
+
+  // --- Save Settings ---
+  if (body.action === "save-settings") {
+    if (body.dataSource) await setValue(DB, "dataSource", body.dataSource);
+    return NextResponse.json({ success: true });
   }
 
   // --- Delete Passkey (requires active session) ---

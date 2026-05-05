@@ -73,7 +73,7 @@ export function DashboardTab({ visible }: { visible: boolean }) {
 
   const loadData = useCallback(async () => {
     try {
-      const r = await fetch("/api/portfolio?baseCurrency=CNY");
+      const r = await fetch("/api/portfolio?baseCurrency=USD");
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const d = await r.json() as PortfolioData;
       if (!d.holdings) throw new Error("Invalid response");
@@ -102,6 +102,7 @@ export function DashboardTab({ visible }: { visible: boolean }) {
     return <p className="text-zinc-500 text-sm text-center py-20">{error || "暂无数据"}</p>;
   }
 
+  const cs = currencySymbols[data.baseCurrency] ?? data.baseCurrency;
   const totalValue = data.totalValue;
   const totalPnl = data.totalPnl ?? 0;
   const totalMarketValue = data.totalMarketValue ?? totalValue;
@@ -130,11 +131,11 @@ export function DashboardTab({ visible }: { visible: boolean }) {
     <div className="space-y-5">
       {/* Row 1: Overall metric cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-3">
-        <MetricCard label="总资产" value={`¥${totalMarketValue.toLocaleString()}`} sub={`成本 ¥${totalValue.toLocaleString()}`} delay={1} />
-        <MetricCard label="今日盈亏" value={todayPnl !== 0 ? `${pnlSign}¥${Math.abs(todayPnl).toLocaleString()}` : "--"} sub={todayPnl !== 0 ? "基于最新价格" : "价格数据更新中"} delay={2} />
-        <MetricCard label="持仓盈亏" value={totalPnl !== 0 ? `${pnlSign}¥${Math.abs(totalPnl).toLocaleString()}` : "--"} sub={totalPnl !== 0 ? "浮动盈亏" : "添加价格数据后计算"} accent delay={3} />
+        <MetricCard label="总资产" value={`${cs}${totalMarketValue.toLocaleString()}`} sub={`成本 ${cs}${totalValue.toLocaleString()}`} delay={1} />
+        <MetricCard label="今日盈亏" value={todayPnl !== 0 ? `${pnlSign}${cs}${Math.abs(todayPnl).toLocaleString()}` : "--"} sub={todayPnl !== 0 ? "基于最新价格" : "价格数据更新中"} delay={2} />
+        <MetricCard label="持仓盈亏" value={totalPnl !== 0 ? `${pnlSign}${cs}${Math.abs(totalPnl).toLocaleString()}` : "--"} sub={totalPnl !== 0 ? "浮动盈亏" : "添加价格数据后计算"} accent delay={3} />
         <MetricCard label="持仓数量" value={holdingsCount.toString()} sub={`${marketCount} 个市场`} delay={4} />
-        <MetricCard label="今日估值" value={`¥${totalMarketValue.toLocaleString()}`} sub="基于最新行情" delay={5} />
+        <MetricCard label="今日估值" value={`${cs}${totalMarketValue.toLocaleString()}`} sub="基于最新行情" delay={5} />
       </div>
 
       {/* Row 1.5: Per-account totals */}
