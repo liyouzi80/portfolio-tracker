@@ -47,9 +47,11 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
   const [symbolName, setSymbolName] = useState("");
   const [lookingUp, setLookingUp] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [searchResults, setSearchResults] = useState<Array<{ symbol: string; name: string; exchange: string }>>([]);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showSearch, setShowSearch] = useState(false);
   const lookupTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  interface SearchResult { symbol: string; fullSymbol: string; name: string; exchange: string; market: string; price?: number | null }
 
   const resetForm = () => {
     setForm({
@@ -78,57 +80,46 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
     return "US"; // Default: letters → US
   }
 
-  const lookupSymbol = useCallback(async (symbol: string, market: string) => {
-    if (!symbol || symbol.length < 1) { setSymbolName(""); return; }
-    setLookingUp(true);
-    try {
-      const res = await fetch(`/api/price?symbol=${symbol.toUpperCase()}&market=${market}`);
-      const data = await res.json() as { name?: string; price?: number | null };
-      setSymbolName(data.name ?? "");
-    } catch { setSymbolName(""); }
-    setLookingUp(false);
-  }, []);
-
   const searchSymbols = useCallback(async (query: string) => {
     if (!query || query.length < 1) { setSearchResults([]); setShowSearch(false); return; }
+    setLookingUp(true);
     try {
       const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-      const data = await res.json() as Array<{ symbol: string; name: string; exchange: string }>;
+      const data = await res.json() as SearchResult[];
       setSearchResults(data);
       setShowSearch(data.length > 0);
     } catch { setSearchResults([]); setShowSearch(false); }
+    setLookingUp(false);
   }, []);
 
-  const selectSearchResult = (item: { symbol: string; name: string }) => {
-    // Parse symbol like "01810.HK" → symbol: "01810", market: "HK"
-    const parts = item.symbol.split(".");
-    const sym = parts[0];
-    const market = parts[1] === "HK" ? "HK" : parts[1] === "SS" || parts[1] === "SZ" ? "CN" : detectMarket(sym);
-    setForm({ ...form, symbol: sym, market });
+  const selectSearchResult = (item: SearchResult) => {
+    setForm({ ...form, symbol: item.symbol, market: item.market });
     setSymbolName(item.name);
     setShowSearch(false);
     setSearchResults([]);
+    // Pre-fill price if available from search
+    if (item.price && item.price > 0) {
+      setForm(f => ({ ...f, symbol: item.symbol, market: item.market, price: item.price!.toString() }));
+    }
   };
 
   const handleSymbolChange = (value: string) => {
-    // Strip market suffix if pasted
-    const clean = value.toUpperCase().replace(/\.(HK|SS|SZ)$/i, "");
+    // Auto-detect market from suffix or format
     const market = detectMarket(value);
+    const clean = value.toUpperCase().replace(/\.(HK|SS|SZ)$/i, "");
     setForm({ ...form, symbol: clean, market });
     setSymbolName("");
-    setShowSearch(false);
+    setSearchResults([]);
     if (lookupTimer.current) clearTimeout(lookupTimer.current);
-    // For short/numeric symbols, verify price; for names, search
-    if (/^[A-Z0-9]+$/.test(clean) && clean.length >= 1) {
-      lookupTimer.current = setTimeout(() => lookupSymbol(clean, market), 400);
+    if (clean.length >= 1) {
+      lookupTimer.current = setTimeout(() => searchSymbols(clean), 300);
     } else {
-      lookupTimer.current = setTimeout(() => searchSymbols(value), 400);
+      setShowSearch(false);
     }
   };
 
   const handleMarketChange = (market: string) => {
     setForm({ ...form, market });
-    if (form.symbol) lookupSymbol(form.symbol, market);
   };
 
   const selectedAccount = accounts.find(a => a.id === form.accountId);
@@ -199,27 +190,39 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
                     value={form.symbol}
                     onChange={(e) => handleSymbolChange(e.target.value)}
                     className="bg-zinc-900 border-zinc-700 h-11 text-sm font-mono placeholder:text-zinc-600 pr-8"
-                    placeholder="AAPL / 小米 / 0700"
+                    placeholder="搜索代码或名称，如 AAPL / 小米 / 0700"
                   />
                   {lookingUp && (
                     <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500 animate-spin" />
                   )}
                 </div>
-                {symbolName && !showSearch && (
-                  <p className="text-xs text-emerald-400/80 truncate">{symbolName}</p>
+                {symbolName && !showSearch && !lookingUp && (
+                  <p className="text-xs text-emerald-400/80 truncate flex items-center gap-1">
+                    <span className="text-[10px] text-emerald-500">✓</span> {symbolName}
+                  </p>
                 )}
                 {/* Search results dropdown */}
                 {showSearch && (
-                  <div className="absolute z-50 mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                  <div className="absolute z-50 mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl max-h-64 overflow-y-auto">
                     {searchResults.map((r, i) => (
                       <button
                         key={i}
                         type="button"
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-zinc-800 flex items-center justify-between"
+                        className="w-full text-left px-3 py-2.5 hover:bg-zinc-800 border-b border-zinc-800 last:border-0 transition-colors"
                         onClick={() => selectSearchResult(r)}
                       >
-                        <span className="font-mono text-white">{r.symbol}</span>
-                        <span className="text-xs text-zinc-400 truncate ml-2">{r.name}</span>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-mono font-semibold text-white text-sm shrink-0">{r.symbol}</span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${
+                              r.market === "US" ? "bg-blue-500/20 text-blue-400" :
+                              r.market === "HK" ? "bg-amber-500/20 text-amber-400" :
+                              "bg-red-500/20 text-red-400"
+                            }`}>{r.market}</span>
+                          </div>
+                          {r.price && <span className="text-xs text-zinc-400 font-mono shrink-0 ml-2">${r.price.toFixed(2)}</span>}
+                        </div>
+                        <p className="text-xs text-zinc-400 truncate mt-0.5">{r.name}{r.exchange ? ` · ${r.exchange}` : ""}</p>
                       </button>
                     ))}
                   </div>
