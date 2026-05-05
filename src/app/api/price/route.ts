@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPlatformEnv } from "@/lib/env";
-import { fetchYahooPrice, fetchYahooQuote, fetchLongbridgePrice } from "@/lib/price";
+import { fetchTencentPrice, fetchLongbridgePrice, fetchYahooQuote } from "@/lib/price";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -19,14 +19,26 @@ export async function GET(req: NextRequest) {
   let name: string | undefined;
   let source = "none";
 
-  try {
-    price = await fetchLongbridgePrice(symbol, market);
-    if (price !== null) source = "longbridge";
-  } catch { /* fallback */ }
+  // 1. Tencent Finance (free, reliable, multi-market)
+  const tencent = await fetchTencentPrice(symbol, market);
+  if (tencent) {
+    price = tencent.price;
+    name = tencent.name;
+    source = "tencent";
+  }
 
+  // 2. Longbridge (if configured)
+  if (price === null) {
+    try {
+      price = await fetchLongbridgePrice(symbol, market);
+      if (price !== null) source = "longbridge";
+    } catch { /* fallback */ }
+  }
+
+  // 3. Yahoo Finance (backup)
   if (price === null) {
     const quote = await fetchYahooQuote(symbol, market);
-    if (quote) { price = quote.price; name = quote.name; source = "yahoo"; }
+    if (quote) { price = quote.price; name = name || quote.name; source = "yahoo"; }
   }
 
   const data = { symbol, market, price, name, source, updatedAt: Date.now() };

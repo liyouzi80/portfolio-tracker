@@ -1,39 +1,59 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchLongbridgePrice, fetchYahooPrice } from "@/lib/price";
+import { fetchTencentPrice, fetchLongbridgePrice, fetchYahooPrice } from "@/lib/price";
 import { getPlatformEnv } from "@/lib/env";
 
 export async function POST(_req: NextRequest) {
-  let lbResult: { configured: boolean; ok: boolean; error?: string } = { configured: false, ok: false };
+  // Test Tencent (free, always available)
+  const tencent = await fetchTencentPrice("AAPL", "US");
+  const tencentOk = tencent !== null;
 
-  // Check if Longbridge creds are configured in env bindings
+  // Check Longbridge
   const env = getPlatformEnv() as unknown as Record<string, string | undefined>;
   const lbConfigured = !!(env?.LONGPORT_APP_KEY || env?.LONGBRIDGE_APP_KEY);
+  let lbResult: { configured: boolean; ok: boolean; error?: string } = { configured: false, ok: false };
 
   if (lbConfigured) {
     lbResult.configured = true;
     try {
       const price = await fetchLongbridgePrice("AAPL", "US");
       if (price !== null) {
-        return NextResponse.json({ success: true, price, symbol: "AAPL.US", source: "longbridge" });
+        lbResult.ok = true;
+        // If Longbridge works, return immediately
+        return NextResponse.json({
+          success: true,
+          price,
+          symbol: "AAPL.US",
+          source: "longbridge",
+          tencent: { ok: tencentOk, price: tencent?.price },
+          longbridge: lbResult,
+        });
       }
-      lbResult.error = "认证通过但 AAPL 行情数据为空，可能是账户未开通美股实时行情权限";
+      lbResult.error = "认证通过但 AAPL 行情数据为空，可能未开通美股实时行情";
     } catch (e: any) {
       lbResult.error = `请求失败: ${e.message || "未知错误"}`;
     }
   }
 
-  // Always test Yahoo as verification
+  // Test Yahoo
   const yahooPrice = await fetchYahooPrice("AAPL", "US");
   const yahooOk = yahooPrice !== null;
 
+  const anyOk = tencentOk || yahooOk;
+  const bestPrice = tencent?.price ?? yahooPrice ?? undefined;
+  const bestSource = tencentOk ? "tencent" : yahooOk ? "yahoo" : "none";
+
   return NextResponse.json({
-    success: yahooOk,
-    price: yahooPrice ?? undefined,
+    success: anyOk,
+    price: bestPrice,
     symbol: "AAPL.US",
-    source: yahooOk ? "yahoo" : "none",
+    source: bestSource,
+    tencent: { ok: tencentOk, price: tencent?.price },
     longbridge: lbResult,
-    note: lbConfigured
-      ? (lbResult.error || "长桥已配置但无数据") + "。Yahoo Finance " + (yahooOk ? "连接正常" : "也失败")
-      : "长桥未配置。Yahoo Finance " + (yahooOk ? "连接正常" : "失败，请检查网络"),
+    yahoo: { ok: yahooOk },
+    note: [
+      tencentOk ? "腾讯财经正常" : "腾讯财经失败",
+      lbConfigured ? `长桥${lbResult.ok ? "正常" : lbResult.error}` : "长桥未配置",
+      yahooOk ? "Yahoo 正常" : "Yahoo 失败",
+    ].join(" | "),
   });
 }

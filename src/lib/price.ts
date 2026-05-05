@@ -1,6 +1,70 @@
-// Yahoo Finance v8 chart API (free, no key required)
-// A-shares: 600519.SS (Shanghai), 000001.SZ (Shenzhen)
-// HK: 0700.HK, US: AAPL
+// --- Tencent Finance (free, no key, multi-market) ---
+// Primary source. Supports CN/HK/US. One request per symbol.
+// Shanghai: sh600519, Shenzhen: sz000001, HK: hk00700, US: aapl
+
+function tencentSymbol(symbol: string, market: string): string {
+  if (market === "CN") {
+    const first = symbol.charAt(0);
+    return first === "6" ? `sh${symbol}` : `sz${symbol}`;
+  }
+  if (market === "HK") return `hk${symbol}`;
+  return symbol.toLowerCase(); // US
+}
+
+export async function fetchTencentPrice(symbol: string, market: string): Promise<{ price: number; name: string } | null> {
+  const qs = tencentSymbol(symbol, market);
+  try {
+    const res = await fetch(`http://qt.gtimg.cn/q=${qs}`, {
+      headers: { "User-Agent": "Mozilla/5.0" },
+    });
+    if (!res.ok) return null;
+    const text = await res.text();
+    // Response: v_sh600519="1~贵州茅台~600519~1850.00~..."
+    const match = text.match(/"([^"]*)"/);
+    if (!match) return null;
+    const fields = match[1].split("~");
+    // fields[0]: 0=停牌,1=正常; [1]: 名称; [3]: 最新价
+    if (fields[0] === "0" || !fields[3] || fields[3] === "0.000") return null;
+    const price = parseFloat(fields[3]);
+    if (!price || isNaN(price)) return null;
+    return { price, name: fields[1] || symbol };
+  } catch {
+    return null;
+  }
+}
+
+// --- Tencent batch fetch (all symbols at once) ---
+export async function fetchTencentPrices(symbols: Array<{ symbol: string; market: string }>): Promise<Map<string, { price: number; name: string }>> {
+  const result = new Map<string, { price: number; name: string }>();
+  if (symbols.length === 0) return result;
+  const qs = symbols.map(s => tencentSymbol(s.symbol, s.market)).join(",");
+  try {
+    const res = await fetch(`http://qt.gtimg.cn/q=${qs}`, {
+      headers: { "User-Agent": "Mozilla/5.0" },
+    });
+    if (!res.ok) return result;
+    const text = await res.text();
+    const matches = text.matchAll(/v_(\w+)="([^"]*)"/g);
+    for (const m of matches) {
+      const fields = m[2].split("~");
+      if (fields[0] === "0" || !fields[3] || fields[3] === "0.000") continue;
+      const price = parseFloat(fields[3]);
+      if (!price || isNaN(price)) continue;
+      // Resolve original symbol from the key
+      const key = m[1]; // e.g., sh600519, hk00700, aapl
+      const original = symbols.find(s => tencentSymbol(s.symbol, s.market) === key);
+      if (original) {
+        result.set(`${original.market}:${original.symbol}`, { price, name: fields[1] });
+      }
+    }
+    return result;
+  } catch {
+    return result;
+  }
+}
+
+// --- Yahoo Finance v8 chart API (free, no key required) ---
+// Backup source. A-shares: 600519.SS, HK: 0700.HK, US: AAPL
 
 function cnSuffix(symbol: string): string {
   // Shanghai: 6xxxxx (600/601/603/605/688)

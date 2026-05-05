@@ -219,17 +219,13 @@ export function SettingsTab() {
     setTesting(true);
     try {
       const res = await fetch("/api/test-connection", { method: "POST" });
-      const data = await res.json() as { success: boolean; price?: number; symbol?: string; source?: string; note?: string; longbridge?: { configured: boolean; ok: boolean; error?: string } };
+      const data = await res.json() as { success: boolean; price?: number; symbol?: string; source?: string; note?: string; tencent?: { ok: boolean; price?: number } };
       if (data.success && data.price) {
-        if (data.source === "longbridge") {
-          toast.success(`长桥: ${data.symbol} = $${data.price}`);
-        } else if (data.longbridge?.configured) {
-          toast.warning(`长桥: ${data.longbridge.error}\nYahoo 备用: $${data.price}`);
-        } else {
-          toast.success(`Yahoo Finance: ${data.symbol} = $${data.price}`);
-        }
+        const sourceLabel = data.source === "tencent" ? "腾讯财经" : data.source === "longbridge" ? "长桥" : data.source === "yahoo" ? "Yahoo" : data.source;
+        toast.success(`${data.symbol} = $${data.price} (${sourceLabel})`);
+        if (data.note) toast.info(data.note, { duration: 5000 });
       } else {
-        toast.error(data.note || "测试失败");
+        toast.error(data.note || "所有数据源均失败");
       }
     } catch {
       toast.error("测试失败: 网络错误");

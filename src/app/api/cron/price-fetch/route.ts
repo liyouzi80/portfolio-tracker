@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db";
 import { alerts, assets } from "@/db/schema";
 import { getPlatformEnv } from "@/lib/env";
-import { fetchYahooPrice, fetchLongbridgePrice } from "@/lib/price";
+import { fetchTencentPrice, fetchLongbridgePrice, fetchYahooPrice } from "@/lib/price";
 import { eq } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
@@ -20,16 +20,18 @@ export async function GET(req: NextRequest) {
     let price: number | null = null;
     let source = "none";
 
-    try {
-      price = await fetchLongbridgePrice(asset.symbol, asset.market);
-      source = "longbridge";
-    } catch {
-      try {
-        price = await fetchYahooPrice(asset.symbol, asset.market);
-        source = "yahoo";
-      } catch {
-        source = "error";
-      }
+    // 1. Tencent Finance (free, multi-market)
+    const tencent = await fetchTencentPrice(asset.symbol, asset.market);
+    if (tencent) { price = tencent.price; source = "tencent"; }
+
+    // 2. Longbridge
+    if (price === null) {
+      try { price = await fetchLongbridgePrice(asset.symbol, asset.market); if (price !== null) source = "longbridge"; } catch { /* fallback */ }
+    }
+
+    // 3. Yahoo Finance
+    if (price === null) {
+      try { price = await fetchYahooPrice(asset.symbol, asset.market); if (price !== null) source = "yahoo"; } catch { source = "error"; }
     }
 
     if (price !== null) {
