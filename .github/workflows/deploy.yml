@@ -9,13 +9,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
       - run: npm ci --legacy-peer-deps
+
       - run: npx @opennextjs/cloudflare build
+
+      # Deploy and inject Worker secrets in one step.
+      # Add optional secrets to GitHub → Settings → Secrets and variables → Actions.
+      # Any secret left unset is skipped automatically.
       - uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
           command: deploy
+          # List secret names here; values come from env below.
+          secrets: |
+            JWT_SECRET
+            LONGBRIDGE_APP_KEY
+            LONGBRIDGE_APP_SECRET
+            LONGBRIDGE_ACCESS_TOKEN
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          LONGBRIDGE_APP_KEY: ${{ secrets.LONGBRIDGE_APP_KEY }}
+          LONGBRIDGE_APP_SECRET: ${{ secrets.LONGBRIDGE_APP_SECRET }}
+          LONGBRIDGE_ACCESS_TOKEN: ${{ secrets.LONGBRIDGE_ACCESS_TOKEN }}
