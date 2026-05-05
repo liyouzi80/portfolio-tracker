@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { getPlatformEnv } from "@/lib/env";
 import {
@@ -12,26 +13,20 @@ export const runtime = "edge";
 let tableEnsured = false;
 async function ensureTable(db: ReturnType<typeof getDb>) {
   if (tableEnsured) return;
-  await (db as any).run(
-    "CREATE TABLE IF NOT EXISTS auth (key TEXT PRIMARY KEY, value TEXT)"
-  );
+  await db.run(sql`CREATE TABLE IF NOT EXISTS auth (key TEXT PRIMARY KEY, value TEXT)`);
   tableEnsured = true;
 }
 
 async function getValue(db: ReturnType<typeof getDb>, key: string): Promise<string | null> {
   await ensureTable(db);
-  const result = await (db as any).run(
-    "SELECT value FROM auth WHERE key = ?", [key]
-  );
-  if (result.results?.length > 0) return result.results[0].value;
+  const rows = await db.all<{ value: string }>(sql`SELECT value FROM auth WHERE key = ${key}`);
+  if (rows.length > 0) return rows[0].value;
   return null;
 }
 
 async function setValue(db: ReturnType<typeof getDb>, key: string, value: string) {
   await ensureTable(db);
-  await (db as any).run(
-    "INSERT OR REPLACE INTO auth (key, value) VALUES (?, ?)", [key, value]
-  );
+  await db.run(sql`INSERT OR REPLACE INTO auth (key, value) VALUES (${key}, ${value})`);
 }
 
 export async function GET(req: NextRequest) {
