@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db";
 import { alerts, assets } from "@/db/schema";
 import { getPlatformEnv } from "@/lib/env";
-import { fetchTencentPrice, fetchLongbridgePrice, fetchYahooPrice } from "@/lib/price";
+import { fetchTencentPrice, fetchFinnhubPrice, fetchLongbridgePrice, fetchYahooPrice } from "@/lib/price";
 import { eq } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
@@ -29,7 +29,13 @@ export async function GET(req: NextRequest) {
       try { price = await fetchLongbridgePrice(asset.symbol, asset.market); if (price !== null) source = "longbridge"; } catch { /* fallback */ }
     }
 
-    // 3. Yahoo Finance
+    // 3. Finnhub (US stocks only)
+    if (price === null && asset.market === "US") {
+      const fh = await fetchFinnhubPrice(asset.symbol, asset.market);
+      if (fh) { price = fh.price; source = "finnhub"; }
+    }
+
+    // 4. Yahoo Finance
     if (price === null) {
       try { price = await fetchYahooPrice(asset.symbol, asset.market); if (price !== null) source = "yahoo"; } catch { source = "error"; }
     }

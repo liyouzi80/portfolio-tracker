@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchTencentPrice, fetchLongbridgePrice, fetchYahooPrice } from "@/lib/price";
+import { fetchTencentPrice, fetchFinnhubPrice, fetchLongbridgePrice, fetchYahooPrice } from "@/lib/price";
 import { getPlatformEnv } from "@/lib/env";
 
 export async function POST(_req: NextRequest) {
   // Test Tencent (free, always available)
   const tencent = await fetchTencentPrice("AAPL", "US");
   const tencentOk = tencent !== null;
+
+  // Test Finnhub (free, needs API key, US only)
+  const finnhub = await fetchFinnhubPrice("AAPL", "US");
+  const finnhubOk = finnhub !== null;
 
   // Check Longbridge
   const env = getPlatformEnv() as unknown as Record<string, string | undefined>;
@@ -38,9 +42,9 @@ export async function POST(_req: NextRequest) {
   const yahooPrice = await fetchYahooPrice("AAPL", "US");
   const yahooOk = yahooPrice !== null;
 
-  const anyOk = tencentOk || yahooOk;
-  const bestPrice = tencent?.price ?? yahooPrice ?? undefined;
-  const bestSource = tencentOk ? "tencent" : yahooOk ? "yahoo" : "none";
+  const anyOk = tencentOk || finnhubOk || yahooOk;
+  const bestPrice = tencent?.price ?? finnhub?.price ?? yahooPrice ?? undefined;
+  const bestSource = tencentOk ? "tencent" : finnhubOk ? "finnhub" : yahooOk ? "yahoo" : "none";
 
   return NextResponse.json({
     success: anyOk,
@@ -48,12 +52,14 @@ export async function POST(_req: NextRequest) {
     symbol: "AAPL.US",
     source: bestSource,
     tencent: { ok: tencentOk, price: tencent?.price },
+    finnhub: { ok: finnhubOk, price: finnhub?.price },
     longbridge: lbResult,
     yahoo: { ok: yahooOk },
     note: [
-      tencentOk ? "腾讯财经正常" : "腾讯财经失败",
+      tencentOk ? "腾讯正常" : "腾讯失败",
+      finnhubOk ? "Finnhub正常" : "Finnhub失败",
       lbConfigured ? `长桥${lbResult.ok ? "正常" : lbResult.error}` : "长桥未配置",
-      yahooOk ? "Yahoo 正常" : "Yahoo 失败",
+      yahooOk ? "Yahoo正常" : "Yahoo失败",
     ].join(" | "),
   });
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPlatformEnv } from "@/lib/env";
-import { fetchTencentPrice, fetchLongbridgePrice, fetchYahooQuote } from "@/lib/price";
+import { fetchTencentPrice, fetchFinnhubPrice, fetchLongbridgePrice, fetchYahooQuote } from "@/lib/price";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -35,7 +35,13 @@ export async function GET(req: NextRequest) {
     } catch { /* fallback */ }
   }
 
-  // 3. Yahoo Finance (backup)
+  // 3. Finnhub (free US stocks, 60 req/min)
+  if (price === null && market === "US") {
+    const finnhub = await fetchFinnhubPrice(symbol, market);
+    if (finnhub) { price = finnhub.price; name = finnhub.name; source = "finnhub"; }
+  }
+
+  // 4. Yahoo Finance (backup)
   if (price === null) {
     const quote = await fetchYahooQuote(symbol, market);
     if (quote) { price = quote.price; name = name || quote.name; source = "yahoo"; }

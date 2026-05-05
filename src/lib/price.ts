@@ -102,6 +102,37 @@ export async function fetchYahooQuote(symbol: string, market: string): Promise<{
   }
 }
 
+// --- Finnhub (free tier: 60 req/min, US stocks only) ---
+// API key stored as Worker secret FINNHUB_API_KEY
+
+export async function fetchFinnhubPrice(symbol: string, market: string): Promise<{ price: number; name: string } | null> {
+  if (market !== "US") return null; // Finnhub is US-only
+  const env = getPlatformEnv() as unknown as Record<string, string | undefined>;
+  const apiKey = env?.FINNHUB_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${apiKey}`);
+    if (!res.ok) return null;
+    const data = await res.json() as { c: number; h: number; l: number; o: number; pc: number; t: number };
+    if (!data.c || data.c === 0) return null;
+
+    // Get company name
+    let name = symbol;
+    try {
+      const profileRes = await fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}&token=${apiKey}`);
+      if (profileRes.ok) {
+        const profile = await profileRes.json() as { name?: string };
+        if (profile.name) name = profile.name;
+      }
+    } catch { /* use symbol as name */ }
+
+    return { price: data.c, name };
+  } catch {
+    return null;
+  }
+}
+
 // --- LongPort / LongBridge OpenAPI (HMAC-SHA256 signed requests) ---
 // Ref: https://github.com/longportapp/openapi-sdk
 // Official SDK (npm: longport) cannot run on Cloudflare Workers (V8 Isolate)
