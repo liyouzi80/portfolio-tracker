@@ -40,6 +40,10 @@ export async function fetchYahooQuote(symbol: string, market: string): Promise<{
 
 // --- LongPort / LongBridge OpenAPI (HMAC-SHA256 signed requests) ---
 // Ref: https://github.com/longportapp/openapi-sdk
+// Official SDK (npm: longport) cannot run on Cloudflare Workers (V8 Isolate)
+// because it depends on native Rust bindings. This is the Edge-compatible impl.
+
+import { getPlatformEnv } from "@/lib/env";
 
 const LONGPORT_BASE_URL = "https://openapi.longportapp.com";
 
@@ -78,29 +82,19 @@ async function signRequest(
   return `HMAC-SHA256 SignedHeaders=${signedHeaders}, Signature=${signature}`;
 }
 
-interface LongportCredentials {
-  appKey: string;
-  appSecret: string;
-  accessToken: string;
-}
+export async function fetchLongbridgePrice(symbol: string, market: string): Promise<number | null> {
+  // Use Cloudflare Workers bindings (env) instead of process.env
+  const env = getPlatformEnv() as unknown as Record<string, string | undefined>;
+  const appKey = env?.LONGPORT_APP_KEY || env?.LONGBRIDGE_APP_KEY;
+  const appSecret = env?.LONGPORT_APP_SECRET || env?.LONGBRIDGE_APP_SECRET;
+  const accessToken = env?.LONGPORT_ACCESS_TOKEN || env?.LONGBRIDGE_ACCESS_TOKEN;
 
-function getEnv(name: string): string | undefined {
-  try {
-    return (typeof process !== "undefined" && process.env?.[name]) || undefined;
-  } catch { return undefined; }
-}
+  if (!appKey || !appSecret || !accessToken) return null;
 
-export async function fetchLongbridgePrice(symbol: string, market: string, creds?: LongportCredentials): Promise<number | null> {
-  const appKey = creds?.appKey || getEnv("LONGPORT_APP_KEY") || getEnv("LONGBRIDGE_APP_KEY");
-  const appSecret = creds?.appSecret || getEnv("LONGPORT_APP_SECRET") || getEnv("LONGBRIDGE_APP_SECRET");
-  const accessToken = creds?.accessToken || getEnv("LONGPORT_ACCESS_TOKEN") || getEnv("LONGBRIDGE_ACCESS_TOKEN");
-
-  if (!appKey || !appSecret || !accessToken) throw new Error("Longbridge not configured");
-
-  const lbMarket = market === "CN" ? "sh" : market === "HK" ? "hk" : "us";
+  // Market suffixes must be UPPERCASE for Longbridge
+  const lbMarket = market === "CN" ? "SH" : market === "HK" ? "HK" : "US";
   const path = "/v1/quote";
   const query = `symbol=${symbol}.${lbMarket}`;
-  const timestamp = Math.floor(Date.now() / 1000).toString();
 
   const signature = await signRequest("GET", path, query, appKey, appSecret, accessToken);
 
@@ -109,17 +103,30 @@ export async function fetchLongbridgePrice(symbol: string, market: string, creds
       headers: {
         "Authorization": accessToken,
         "X-Api-Key": appKey,
-        "X-Timestamp": timestamp,
+        "X-Timestamp": Math.floor(Date.now() / 1000).toString(),
         "X-Api-Signature": signature,
         "Content-Type": "application/json; charset=utf-8",
         "User-Agent": "openapi-sdk",
       },
     });
-    if (!res.ok) throw new Error(`Longbridge HTTP ${res.status}`);
-    const raw = await res.json() as Record<string, unknown>;
-    // Server returns snake_case; also check camelCase (SDK convention)
-    const price = raw.last_done ?? raw.lastDone ?? raw.last_price ?? raw.lastPrice ?? raw.price;
-    return typeof price === "number" ? price : null;
+    if (!res.ok) return null;
+
+    const json = await res.json() as any;
+
+    // Response may be wrapped: {code: 0, data: [{last_done: "150.00"}]}
+    // or flat: {last_done: 150.00}
+    let quote: any;
+    if (json.code !== undefined && Array.isArray(json.data)) {
+      quote = json.data[0];
+    } else {
+      quote = json;
+    }
+    if (!quote) return null;
+
+    // last_done is the latest trade price, may be string or number
+    const price = quote.last_done ?? quote.lastDone ?? quote.last_price ?? quote.lastPrice ?? quote.price;
+    if (price === undefined || price === null) return null;
+    return typeof price === "number" ? price : Number(price);
   } catch {
     return null;
   }
