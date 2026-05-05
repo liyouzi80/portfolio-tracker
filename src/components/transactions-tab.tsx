@@ -13,12 +13,7 @@ import { Plus, Upload, Search, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface Txn { id: string; symbol: string; type: string; quantity: number; price: number; fee: number; date: string; market: string; currency: string }
-
-const accounts = [
-  { id: "1", name: "盈透证券", currency: "USD" },
-  { id: "2", name: "长桥", currency: "HKD" },
-  { id: "3", name: "A股", currency: "CNY" },
-];
+interface Account { id: string; name: string; currency: string }
 
 const typeLabels: Record<string, string> = { buy: "买入", sell: "卖出", dividend: "股息" };
 const typeColors: Record<string, string> = {
@@ -29,6 +24,7 @@ const typeColors: Record<string, string> = {
 
 export function TransactionsTab() {
   const [txns, setTxns] = useState<Txn[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -62,7 +58,12 @@ export function TransactionsTab() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { loadTxns(); }, [loadTxns]);
+  useEffect(() => {
+    loadTxns();
+    fetch("/api/accounts").then(async (r) => {
+      if (r.ok) setAccounts(await r.json() as Account[]);
+    }).catch(() => {});
+  }, [loadTxns]);
 
   const handleDelete = async (id: string) => {
     setDeleting(id);
@@ -78,8 +79,7 @@ export function TransactionsTab() {
 
   const handleSaveTxn = async (t: { accountId: string; symbol: string; market: string; type: string; quantity: number; price: number; fee: number; date: string }) => {
     try {
-      const acc = accounts.find((a) => a.id === t.accountId);
-      const currency = acc?.currency ?? (t.market === "HK" ? "HKD" : t.market === "CN" ? "CNY" : "USD");
+      const currency = t.market === "HK" ? "HKD" : t.market === "CN" ? "CNY" : "USD";
       // Ensure asset exists
       const assetRes = await fetch("/api/assets", {
         method: "POST",
@@ -164,7 +164,7 @@ export function TransactionsTab() {
             <Loader2 className="h-6 w-6 text-zinc-500 animate-spin" />
           </div>
         ) : (
-          <Table>
+          <div className="overflow-x-auto"><Table>
             <TableHeader>
               <TableRow className="border-zinc-800 hover:bg-transparent">
                 <TableHead className="text-zinc-500">日期</TableHead>
@@ -218,7 +218,7 @@ export function TransactionsTab() {
                 </TableRow>
               )}
             </TableBody>
-          </Table>
+          </Table></div>
         )}
       </CardContent>
 

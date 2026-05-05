@@ -59,13 +59,16 @@ export function SettingsTab() {
   const [testing, setTesting] = useState(false);
   const [registeringPasskey, setRegisteringPasskey] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [hasPasskey, setHasPasskey] = useState(false);
+  const [deletingPasskey, setDeletingPasskey] = useState(false);
   const passkeyAvailable = typeof window !== "undefined" && !!window.PublicKeyCredential;
 
   const loadData = useCallback(async () => {
     try {
-      const [accRes, alertRes] = await Promise.all([
+      const [accRes, alertRes, authRes] = await Promise.all([
         fetch("/api/accounts"),
         fetch("/api/alerts"),
+        fetch("/api/auth"),
       ]);
       if (accRes.ok) {
         const accData = await accRes.json() as Array<{ id: string; name: string; currency: string; leverage: number }>;
@@ -80,6 +83,10 @@ export function SettingsTab() {
           threshold: a.threshold,
           enabled: a.enabled === 1,
         })));
+      }
+      if (authRes.ok) {
+        const authData = await authRes.json() as { hasPasskey?: boolean };
+        setHasPasskey(authData.hasPasskey ?? false);
       }
     } catch { /* ignore */ }
     setLoading(false);
@@ -170,7 +177,7 @@ export function SettingsTab() {
         body: JSON.stringify({ action: "passkey-register", prfHash }),
       });
       const data = await res.json() as { success?: boolean; error?: string };
-      if (data.success) toast.success("Passkey 注册成功，下次可免密登录");
+      if (data.success) { setHasPasskey(true); toast.success("Passkey 注册成功，下次可免密登录"); }
       else toast.error(data.error || "注册失败");
     } catch (e: any) {
       toast.error(e.message || "Passkey 注册失败");
@@ -178,13 +185,30 @@ export function SettingsTab() {
     setRegisteringPasskey(false);
   };
 
+  const handleDeletePasskey = async () => {
+    setDeletingPasskey(true);
+    try {
+      await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete-passkey" }),
+      });
+      setHasPasskey(false);
+      toast.success("Passkey 已删除");
+    } catch { toast.error("删除失败"); }
+    setDeletingPasskey(false);
+  };
+
   const handleTestConnection = async () => {
     setTesting(true);
     try {
       const res = await fetch("/api/test-connection", { method: "POST" });
-      const data = await res.json() as { success: boolean; price?: number; symbol?: string; error?: string };
-      if (data.success && data.price) toast.success(`测试成功: ${data.symbol} = $${data.price}`);
-      else toast.error(data.error || "测试失败");
+      const data = await res.json() as { success: boolean; price?: number; symbol?: string; source?: string; note?: string; error?: string };
+      if (data.success && data.price) {
+        toast.success(`${data.symbol} = $${data.price} (${data.source === "yahoo" ? "Yahoo Finance" : "长桥"})`);
+      } else {
+        toast.error(data.error || "测试失败");
+      }
     } catch {
       toast.error("测试失败: 网络错误");
     }
@@ -213,7 +237,7 @@ export function SettingsTab() {
           {accounts.length === 0 ? (
             <p className="text-zinc-500 text-sm text-center py-8">暂无账户，点击"添加"创建</p>
           ) : (
-            <Table>
+            <div className="overflow-x-auto"><Table>
               <TableHeader>
                 <TableRow className="border-zinc-800 hover:bg-transparent">
                   <TableHead className="text-zinc-500">账户名称</TableHead>
@@ -241,7 +265,7 @@ export function SettingsTab() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </Table></div>
           )}
         </CardContent>
       </Card>
@@ -260,7 +284,7 @@ export function SettingsTab() {
           {alerts.length === 0 ? (
             <p className="text-zinc-500 text-sm text-center py-8">暂无提醒，点击"添加"创建</p>
           ) : (
-            <Table>
+            <div className="overflow-x-auto"><Table>
               <TableHeader>
                 <TableRow className="border-zinc-800 hover:bg-transparent">
                   <TableHead className="text-zinc-500">代码</TableHead>
@@ -291,7 +315,7 @@ export function SettingsTab() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </Table></div>
           )}
         </CardContent>
       </Card>
@@ -307,7 +331,24 @@ export function SettingsTab() {
               <p className="text-sm text-zinc-300">Passkey 快速登录</p>
               <p className="text-xs text-zinc-500 mt-0.5">注册后可用 Touch ID / Face ID / Windows Hello 解锁</p>
             </div>
-            {passkeyAvailable ? (
+            {!passkeyAvailable ? (
+              <span className="text-xs text-zinc-600">此设备不支持</span>
+            ) : hasPasskey ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-red-800 text-red-400 hover:bg-red-950/30"
+                onClick={handleDeletePasskey}
+                disabled={deletingPasskey}
+              >
+                {deletingPasskey ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5 mr-1" />
+                )}
+                {deletingPasskey ? "删除中..." : "删除 Passkey"}
+              </Button>
+            ) : (
               <Button
                 size="sm"
                 variant="outline"
@@ -322,8 +363,6 @@ export function SettingsTab() {
                 )}
                 {registeringPasskey ? "注册中..." : "注册 Passkey"}
               </Button>
-            ) : (
-              <span className="text-xs text-zinc-600">此设备不支持</span>
             )}
           </div>
         </CardContent>

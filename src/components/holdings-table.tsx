@@ -24,7 +24,7 @@ const marketColors: Record<string, string> = {
 
 export function HoldingsTable({ data }: { data: Holding[] }) {
   return (
-    <Table>
+    <div className="overflow-x-auto"><Table>
       <TableHeader>
         <TableRow className="border-zinc-800 hover:bg-transparent">
           <TableHead className="text-zinc-500">代码</TableHead>
@@ -57,6 +57,6 @@ export function HoldingsTable({ data }: { data: Holding[] }) {
           </TableRow>
         ))}
       </TableBody>
-    </Table>
+    </Table></div>
   );
 }

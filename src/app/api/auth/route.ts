@@ -128,6 +128,12 @@ export async function POST(req: NextRequest) {
     return res;
   }
 
+  // --- Delete Passkey ---
+  if (body.action === "delete-passkey") {
+    await DB.prepare("DELETE FROM auth WHERE key = 'passkeyHash'").run();
+    return NextResponse.json({ success: true });
+  }
+
   // --- Logout ---
   if (body.action === "logout") {
     const res = NextResponse.json({ success: true });

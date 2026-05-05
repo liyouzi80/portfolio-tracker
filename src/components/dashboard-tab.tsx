@@ -20,14 +20,23 @@ interface Holding {
   avgCost: number;
 }
 
+interface AccountSummary {
+  id: string;
+  name: string;
+  currency: string;
+  totalCost: number;
+  holdings: Holding[];
+}
+
 interface PortfolioData {
   baseCurrency: string;
   totalValue: number;
-  totalValueFormatted: string;
+  accounts: AccountSummary[];
   holdings: Holding[];
   rates: Record<string, number>;
 }
 
+const currencySymbols: Record<string, string> = { CNY: "¥", USD: "$", HKD: "HK$" };
 const marketLabels: Record<string, string> = { US: "美股", HK: "港股", CN: "A股" };
 const marketColors: Record<string, string> = { US: "#3b82f6", HK: "#f59e0b", CN: "#ef4444" };
 
@@ -97,14 +106,31 @@ export function DashboardTab() {
 
   return (
     <div className="space-y-5">
-      {/* Row 1: Metric cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <MetricCard label="总资产" value={`¥${totalValue.toLocaleString()}`} sub="成本计价" delay={1} />
+      {/* Row 1: Overall metric cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-3">
+        <MetricCard label="总资产" value={`¥${totalValue.toLocaleString()}`} sub="成本计价 (CNY)" delay={1} />
         <MetricCard label="今日盈亏" value="--" sub="需接入实时价格" delay={2} />
         <MetricCard label="YTD 收益" value="--" sub="需接入实时价格" delay={3} />
         <MetricCard label="累计盈亏" value="--" sub="需接入实时价格" accent delay={4} />
         <MetricCard label="持仓数量" value={holdingsCount.toString()} sub={`${marketCount} 个市场`} delay={5} />
       </div>
+
+      {/* Row 1.5: Per-account totals */}
+      {data.accounts.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 md:gap-3">
+          {data.accounts.map((a) => (
+            <Card key={a.id} className="t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+              <CardContent className="py-3">
+                <p className="text-xs text-zinc-500">{a.name}</p>
+                <p className="text-lg font-mono font-bold">
+                  {currencySymbols[a.currency] ?? a.currency + " "}{a.totalCost.toLocaleString()}
+                </p>
+                <p className="text-xs text-zinc-600">{a.holdings.length} 个标的</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Row 2: Profit curve (full width) */}
       <Card className="stagger-6 t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
