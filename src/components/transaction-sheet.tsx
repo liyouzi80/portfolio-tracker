@@ -7,13 +7,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+interface Account {
+  id: string;
+  name: string;
+  currency: string;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
+const accounts: Account[] = [
+  { id: "1", name: "盈透证券", currency: "USD" },
+  { id: "2", name: "长桥", currency: "HKD" },
+  { id: "3", name: "A股", currency: "CNY" },
+];
+
 export function TransactionSheet({ open, onOpenChange }: Props) {
   const [form, setForm] = useState({
+    accountId: "",
     symbol: "",
     market: "US",
     type: "buy",
@@ -24,8 +37,11 @@ export function TransactionSheet({ open, onOpenChange }: Props) {
   });
 
   const handleSubmit = () => {
+    if (!form.accountId || !form.symbol || !form.quantity || !form.price) return;
     onOpenChange(false);
   };
+
+  const isValid = form.accountId && form.symbol && form.quantity && form.price;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -34,6 +50,20 @@ export function TransactionSheet({ open, onOpenChange }: Props) {
           <SheetTitle className="text-zinc-100">新增交易</SheetTitle>
         </SheetHeader>
         <div className="space-y-4 mt-6">
+          <div className="space-y-2">
+            <Label className="text-zinc-400">选择账户</Label>
+            <Select value={form.accountId} onValueChange={(v) => v && setForm({ ...form, accountId: v })}>
+              <SelectTrigger className="bg-zinc-900 border-zinc-700">
+                <SelectValue placeholder="选择账户..." />
+              </SelectTrigger>
+              <SelectContent>
+                {accounts.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>{a.name} ({a.currency})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-2">
             <Label className="text-zinc-400">股票代码</Label>
             <Input value={form.symbol} onChange={(e) => setForm({ ...form, symbol: e.target.value })} className="bg-zinc-900 border-zinc-700" placeholder="AAPL" />
@@ -90,7 +120,7 @@ export function TransactionSheet({ open, onOpenChange }: Props) {
             </div>
           </div>
 
-          <Button onClick={handleSubmit} className="w-full mt-4">保存交易</Button>
+          <Button onClick={handleSubmit} disabled={!isValid} className="w-full mt-4">保存交易</Button>
         </div>
       </SheetContent>
     </Sheet>

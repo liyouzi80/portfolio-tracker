@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { HoldingsTable } from "./holdings-table";
 import { NetValueChart } from "./net-value-chart";
 import { AllocationPie } from "./allocation-pie";
+import { ProfitCurve } from "./profit-curve";
 
 const mockPortfolio = {
   baseCurrency: "CNY",
@@ -23,9 +24,11 @@ export function DashboardTab() {
     return { value: currentTotal - mockPortfolio.totalValue, pct: ((currentTotal - mockPortfolio.totalValue) / mockPortfolio.totalValue * 100).toFixed(2) };
   }, []);
 
+  const ytdValue = useMemo(() => ({ value: 48500, pct: "20.51" }), []);
+
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card className="bg-zinc-900/50 border-zinc-800">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-normal text-zinc-400">总资产</CardTitle>
@@ -43,6 +46,18 @@ export function DashboardTab() {
           <CardContent>
             <div className="text-2xl font-bold tracking-tight text-emerald-400">+¥2,340</div>
             <div className="text-xs text-emerald-500/70 mt-1">+0.82%</div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-zinc-900/50 border-zinc-800">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-normal text-zinc-400">YTD 收益</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold tracking-tight text-emerald-400">
+              +¥{ytdValue.value.toLocaleString()}
+            </div>
+            <div className="text-xs text-emerald-500/70 mt-1">+{ytdValue.pct}%</div>
           </CardContent>
         </Card>
 
@@ -69,13 +84,33 @@ export function DashboardTab() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="md:col-span-2 bg-zinc-900/50 border-zinc-800">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="bg-zinc-900/50 border-zinc-800">
           <CardHeader>
             <CardTitle className="text-sm font-medium">净值曲线</CardTitle>
           </CardHeader>
           <CardContent>
             <NetValueChart />
+          </CardContent>
+        </Card>
+
+        <Card className="bg-zinc-900/50 border-zinc-800">
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">盈亏走势</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ProfitCurve />
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="md:col-span-2 bg-zinc-900/50 border-zinc-800">
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">持仓明细</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <HoldingsTable data={mockPortfolio.holdings} />
           </CardContent>
         </Card>
 
@@ -88,15 +123,6 @@ export function DashboardTab() {
           </CardContent>
         </Card>
       </div>
-
-      <Card className="bg-zinc-900/50 border-zinc-800">
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">持仓明细</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <HoldingsTable data={mockPortfolio.holdings} />
-        </CardContent>
-      </Card>
     </div>
   );
 }

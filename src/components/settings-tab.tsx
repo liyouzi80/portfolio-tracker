@@ -5,6 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AccountSheet } from "./account-sheet";
 import { AlertSheet } from "./alert-sheet";
 import { Plus, Pencil, Trash2 } from "lucide-react";
@@ -117,14 +120,29 @@ export function SettingsTab() {
 
       <Card className="bg-zinc-900/50 border-zinc-800">
         <CardHeader>
-          <CardTitle className="text-sm font-medium">数据源</CardTitle>
+          <CardTitle className="text-sm font-medium">数据源配置</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-4 text-sm">
-            <span className="text-zinc-400">行情源：</span>
-            <Badge className="bg-emerald-500/10 text-emerald-400">长桥 (主)</Badge>
-            <span className="text-zinc-600">→</span>
-            <Badge variant="outline" className="border-zinc-700 text-zinc-500">Yahoo Finance (备)</Badge>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-zinc-400">主数据源</Label>
+            <Select defaultValue="longbridge">
+              <SelectTrigger className="bg-zinc-900 border-zinc-700">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="longbridge">长桥 (Longbridge)</SelectItem>
+                <SelectItem value="yahoo">Yahoo Finance</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-3 pt-2 border-t border-zinc-800">
+            <Label className="text-zinc-400 text-xs">长桥 API 参数</Label>
+            <Input className="bg-zinc-900 border-zinc-700 h-9 text-sm" placeholder="App Key" type="password" />
+            <Input className="bg-zinc-900 border-zinc-700 h-9 text-sm" placeholder="App Secret" type="password" />
+            <p className="text-xs text-zinc-600">从长桥开放平台获取: open.longbridge.com</p>
+          </div>
+          <div className="pt-2 border-t border-zinc-800">
+            <p className="text-xs text-zinc-500">未配置长桥密钥时自动使用 Yahoo Finance 作为备用数据源。</p>
           </div>
         </CardContent>
       </Card>
