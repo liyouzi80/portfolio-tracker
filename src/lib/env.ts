@@ -1,4 +1,4 @@
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getRequestContext } from "@cloudflare/next-on-pages";
 
 declare global {
   interface CloudflareEnv {
@@ -8,6 +8,5 @@ declare global {
 }
 
 export function getPlatformEnv() {
-  const { env } = getCloudflareContext();
-  return env;
+  return getRequestContext().env;
 }
