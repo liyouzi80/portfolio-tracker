@@ -18,6 +18,22 @@ const mockPortfolio = {
   ],
 };
 
+function MetricCard({ label, value, sub, accent, delay }: { label: string; value: string; sub?: string; accent?: boolean; delay: number }) {
+  return (
+    <Card className={`stagger-${delay} t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]`}>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-xs font-normal tracking-wide text-zinc-500 uppercase">{label}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className={`text-2xl font-bold tracking-tight font-mono tabular-nums ${accent ? 'text-emerald-400' : ''}`}>
+          {value}
+        </div>
+        {sub && <div className={`text-xs mt-1 font-mono ${accent ? 'text-emerald-500/70' : 'text-zinc-600'}`}>{sub}</div>}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function DashboardTab() {
   const totalPL = useMemo(() => {
     const currentTotal = 312000;
@@ -27,76 +43,28 @@ export function DashboardTab() {
   const ytdValue = useMemo(() => ({ value: 48500, pct: "20.51" }), []);
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card className="bg-zinc-900/50 border-zinc-800">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-normal text-zinc-400">总资产</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold tracking-tight">¥285,000</div>
-            <div className="text-xs text-zinc-500 mt-1">≈ $39,490 USD</div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-zinc-900/50 border-zinc-800">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-normal text-zinc-400">今日盈亏</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold tracking-tight text-emerald-400">+¥2,340</div>
-            <div className="text-xs text-emerald-500/70 mt-1">+0.82%</div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-zinc-900/50 border-zinc-800">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-normal text-zinc-400">YTD 收益</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold tracking-tight text-emerald-400">
-              +¥{ytdValue.value.toLocaleString()}
-            </div>
-            <div className="text-xs text-emerald-500/70 mt-1">+{ytdValue.pct}%</div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-zinc-900/50 border-zinc-800">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-normal text-zinc-400">累计盈亏</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold tracking-tight text-emerald-400">
-              +¥{totalPL.value.toLocaleString()}
-            </div>
-            <div className="text-xs text-emerald-500/70 mt-1">+{totalPL.pct}%</div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-zinc-900/50 border-zinc-800">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-normal text-zinc-400">持仓数量</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold tracking-tight">4</div>
-            <div className="text-xs text-zinc-500 mt-1">3 个市场</div>
-          </CardContent>
-        </Card>
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <MetricCard label="总资产" value="¥285,000" sub="≈ $39,490 USD" delay={1} />
+        <MetricCard label="今日盈亏" value="+¥2,340" sub="+0.82%" accent delay={2} />
+        <MetricCard label="YTD 收益" value={`+¥${ytdValue.value.toLocaleString()}`} sub={`+${ytdValue.pct}%`} accent delay={3} />
+        <MetricCard label="累计盈亏" value={`+¥${totalPL.value.toLocaleString()}`} sub={`+${totalPL.pct}%`} accent delay={4} />
+        <MetricCard label="持仓数量" value="4" sub="3 个市场" delay={5} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="bg-zinc-900/50 border-zinc-800">
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">净值曲线</CardTitle>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <Card className="stagger-6 t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium tracking-wide">净值曲线</CardTitle>
           </CardHeader>
           <CardContent>
             <NetValueChart />
           </CardContent>
         </Card>
 
-        <Card className="bg-zinc-900/50 border-zinc-800">
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">盈亏走势</CardTitle>
+        <Card className="stagger-7 t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium tracking-wide">盈亏走势</CardTitle>
           </CardHeader>
           <CardContent>
             <ProfitCurve />
@@ -104,19 +72,19 @@ export function DashboardTab() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="md:col-span-2 bg-zinc-900/50 border-zinc-800">
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">持仓明细</CardTitle>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Card className="md:col-span-2 stagger-8 t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium tracking-wide">持仓明细</CardTitle>
           </CardHeader>
           <CardContent>
             <HoldingsTable data={mockPortfolio.holdings} />
           </CardContent>
         </Card>
 
-        <Card className="bg-zinc-900/50 border-zinc-800">
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">资产配置</CardTitle>
+        <Card className="stagger-8 t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium tracking-wide">资产配置</CardTitle>
           </CardHeader>
           <CardContent>
             <AllocationPie />

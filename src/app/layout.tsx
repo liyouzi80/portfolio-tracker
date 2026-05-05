@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "股票持仓管理",
+  title: "Portfolio",
   description: "个人投资组合追踪工具",
 };
 

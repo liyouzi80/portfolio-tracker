@@ -39,7 +39,7 @@ export function TransactionsTab() {
   });
 
   return (
-    <Card className="bg-zinc-900/50 border-zinc-800">
+    <Card className="t-tab-content t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-medium">交易记录</CardTitle>

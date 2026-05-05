@@ -13,11 +13,11 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <header className="sticky top-0 z-50 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 glass">
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500" />
-            <h1 className="text-lg font-semibold tracking-tight">股票持仓管理</h1>
+            <h1 className="text-lg font-semibold tracking-tight">Portfolio</h1>
           </div>
           <Tabs value={tab} onValueChange={setTab}>
             <TabsList className="bg-zinc-900 border border-zinc-800">

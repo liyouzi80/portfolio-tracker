@@ -22,51 +22,189 @@
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
     --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.625rem;
+    --chart-1: 160 60% 45%;
+    --chart-2: 220 70% 50%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 340 75% 55%;
+    --chart-5: 280 65% 60%;
+    --radius: 0.75rem;
   }
 
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --background: 240 6% 7%;
+    --foreground: 240 5% 92%;
+    --card: 240 5% 10%;
+    --card-foreground: 240 5% 92%;
+    --popover: 240 5% 10%;
+    --popover-foreground: 240 5% 92%;
+    --primary: 240 5% 96%;
+    --primary-foreground: 240 6% 7%;
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 240 5% 92%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 4% 56%;
+    --accent: 240 4% 16%;
+    --accent-foreground: 240 5% 92%;
+    --destructive: 0 62% 40%;
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+    --ring: 240 5% 65%;
+    --chart-1: 160 55% 45%;
+    --chart-2: 220 65% 50%;
+    --chart-3: 35 75% 52%;
+    --chart-4: 340 65% 50%;
+    --chart-5: 270 55% 55%;
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground antialiased; }
 }
 
+/* ---- transitions-dev universal install ---- */
+:root {
+  --resize-dur: 300ms;
+  --resize-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --digit-dur: 500ms;
+  --digit-distance: 8px;
+  --digit-stagger: 70ms;
+  --digit-blur: 2px;
+  --digit-ease: cubic-bezier(0.34, 1.45, 0.64, 1);
+  --digit-dir-x: 0;
+  --digit-dir-y: 1;
+  --badge-slide-dur: 260ms;
+  --badge-pop-dur: 500ms;
+  --badge-pop-close-dur: 180ms;
+  --badge-fade-dur: 400ms;
+  --badge-fade-close-dur: 180ms;
+  --badge-blur: 2px;
+  --badge-offset-x: -8.2px;
+  --badge-offset-y: 12.4px;
+  --badge-slide-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --badge-pop-ease: cubic-bezier(0.34, 1.36, 0.64, 1);
+  --badge-close-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --text-swap-dur: 200ms;
+  --text-swap-translate-y: 8px;
+  --text-swap-blur: 2px;
+  --text-swap-ease: ease-out;
+  --dropdown-open-dur: 250ms;
+  --dropdown-close-dur: 150ms;
+  --dropdown-pre-scale: 0.97;
+  --dropdown-closing-scale: 0.99;
+  --dropdown-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --modal-open-dur: 250ms;
+  --modal-close-dur: 150ms;
+  --modal-scale: 0.96;
+  --modal-scale-close: 0.96;
+  --modal-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --panel-open-dur: 400ms;
+  --panel-close-dur: 350ms;
+  --panel-translate-y: 100px;
+  --panel-blur: 2px;
+  --panel-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --page-slide-dur: 200ms;
+  --page-fade-dur: 200ms;
+  --page-slide-distance: 8px;
+  --page-blur: 3px;
+  --page-stagger: 0ms;
+  --page-exit-enabled: 1;
+  --page-slide-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --page-fade-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --icon-swap-dur: 200ms;
+  --icon-swap-blur: 2px;
+  --icon-swap-start-scale: 0.25;
+  --icon-swap-ease: ease-in-out;
+}
+
+/* ---- Staggered reveal on page load ---- */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.stagger-1 { animation: fade-up 0.5s var(--panel-ease) both; animation-delay: 0.05s; }
+.stagger-2 { animation: fade-up 0.5s var(--panel-ease) both; animation-delay: 0.1s; }
+.stagger-3 { animation: fade-up 0.5s var(--panel-ease) both; animation-delay: 0.15s; }
+.stagger-4 { animation: fade-up 0.5s var(--panel-ease) both; animation-delay: 0.2s; }
+.stagger-5 { animation: fade-up 0.5s var(--panel-ease) both; animation-delay: 0.25s; }
+.stagger-6 { animation: fade-up 0.5s var(--panel-ease) both; animation-delay: 0.3s; }
+.stagger-7 { animation: fade-up 0.5s var(--panel-ease) both; animation-delay: 0.35s; }
+.stagger-8 { animation: fade-up 0.5s var(--panel-ease) both; animation-delay: 0.4s; }
+
+/* ---- Number pop-in ---- */
+.t-digit {
+  display: inline-block;
+  transition: transform var(--digit-dur) var(--digit-ease),
+              opacity var(--digit-dur) var(--digit-ease),
+              filter var(--digit-dur) var(--digit-ease);
+}
+.t-digit.is-animating {
+  transform: translateY(calc(var(--digit-distance) * var(--digit-dir-y) * -1));
+  opacity: 0;
+  filter: blur(var(--digit-blur));
+}
+
+/* ---- Card hover micro-interaction ---- */
+.t-card {
+  transition: transform 0.3s var(--resize-ease),
+              box-shadow 0.3s var(--resize-ease),
+              border-color 0.3s var(--resize-ease);
+}
+.t-card:hover {
+  transform: translateY(-2px);
+  border-color: hsl(240 4% 22%);
+  box-shadow: 0 8px 30px -12px rgba(0,0,0,0.4);
+}
+
+/* ---- Panel reveal (sheets) ---- */
+.t-panel {
+  transform-origin: var(--panel-origin, right center);
+  animation: panel-open var(--panel-open-dur) var(--panel-ease) both;
+}
+@keyframes panel-open {
+  from { opacity: 0; transform: translateX(100%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* ---- Tab transition ---- */
+.t-tab-content {
+  animation: fade-up 0.35s var(--panel-ease) both;
+}
+
+/* ---- Glass refinement ---- */
+.glass {
+  background: hsl(240 5% 10% / 0.85);
+  backdrop-filter: blur(20px) saturate(1.2);
+  border: 1px solid hsl(240 4% 16%);
+  box-shadow: inset 0 1px 0 hsl(240 5% 100% / 0.05);
+}
+
+/* ---- Marquee ---- */
 @keyframes marquee {
   0% { transform: translateX(0); }
   100% { transform: translateX(-50%); }
+}
+
+/* ---- Reduced motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  .stagger-1, .stagger-2, .stagger-3, .stagger-4,
+  .stagger-5, .stagger-6, .stagger-7, .stagger-8,
+  .t-tab-content, .t-panel {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .t-card:hover { transform: none; }
+  .t-digit.is-animating { transform: none; opacity: 1; filter: none; }
 }

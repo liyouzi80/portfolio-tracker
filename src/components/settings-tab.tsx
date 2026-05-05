@@ -29,7 +29,7 @@ export function SettingsTab() {
 
   return (
     <div className="space-y-6">
-      <Card className="bg-zinc-900/50 border-zinc-800">
+      <Card className="t-tab-content t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-medium">账户管理</CardTitle>
@@ -74,7 +74,7 @@ export function SettingsTab() {
         </CardContent>
       </Card>
 
-      <Card className="bg-zinc-900/50 border-zinc-800">
+      <Card className="t-tab-content t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-medium">价格提醒</CardTitle>
@@ -118,7 +118,7 @@ export function SettingsTab() {
         </CardContent>
       </Card>
 
-      <Card className="bg-zinc-900/50 border-zinc-800">
+      <Card className="t-tab-content t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
         <CardHeader>
           <CardTitle className="text-sm font-medium">数据源配置</CardTitle>
         </CardHeader>
