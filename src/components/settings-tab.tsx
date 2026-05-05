@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AccountSheet } from "./account-sheet";
 import { AlertSheet } from "./alert-sheet";
-import { Plus, Pencil, Trash2, Zap, Check } from "lucide-react";
+import { Plus, Trash2, Zap, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface Account { id: string; name: string; currency: string; leverage: number }
@@ -24,31 +24,111 @@ export function SettingsTab() {
   const [dataSource, setDataSource] = useState("longbridge");
   const [lbKey, setLbKey] = useState("");
   const [lbSecret, setLbSecret] = useState("");
+  const [lbAccessToken, setLbAccessToken] = useState("");
   const [testing, setTesting] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const handleAddAccount = (acc: { name: string; currency: string; leverage: number }) => {
-    setAccounts([...accounts, { id: Date.now().toString(36), ...acc }]);
-    toast.success("账户已添加");
+  const loadData = useCallback(async () => {
+    try {
+      const [accRes, alertRes] = await Promise.all([
+        fetch("/api/accounts"),
+        fetch("/api/alerts"),
+      ]);
+      const accData = await accRes.json() as Account[];
+      const alertData = await alertRes.json() as Array<{
+        id: string; symbol: string; conditionType: string; threshold: number; enabled: number;
+      }>;
+      setAccounts(accData);
+      setAlerts(alertData.map((a) => ({
+        id: a.id,
+        symbol: a.symbol ?? "?",
+        condition: a.conditionType,
+        threshold: a.threshold,
+        enabled: a.enabled === 1,
+      })));
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const handleAddAccount = async (acc: { name: string; currency: string; leverage: number }) => {
+    try {
+      const res = await fetch("/api/accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(acc),
+      });
+      const data = await res.json() as { id?: string; error?: string };
+      if (data.id) {
+        setAccounts([...accounts, { id: data.id, ...acc }]);
+        toast.success("账户已添加");
+      } else {
+        toast.error(data.error || "添加失败");
+      }
+    } catch { toast.error("网络错误"); }
   };
 
-  const handleDeleteAccount = (id: string) => {
-    setAccounts(accounts.filter((a) => a.id !== id));
-    toast.success("账户已删除");
+  const handleDeleteAccount = async (id: string) => {
+    try {
+      const res = await fetch(`/api/accounts?id=${id}`, { method: "DELETE" });
+      const data = await res.json() as { success?: boolean; error?: string };
+      if (data.success) {
+        setAccounts(accounts.filter((a) => a.id !== id));
+        toast.success("账户已删除");
+      } else {
+        toast.error(data.error || "删除失败");
+      }
+    } catch { toast.error("网络错误"); }
   };
 
-  const handleAddAlert = (a: { symbol: string; condition: string; threshold: number }) => {
-    setAlerts([...alerts, { id: Date.now().toString(36), ...a, enabled: true }]);
-    toast.success("提醒已创建");
+  const handleAddAlert = async (a: { symbol: string; condition: string; threshold: number }) => {
+    try {
+      const res = await fetch("/api/alerts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol: a.symbol,
+          market: a.symbol.match(/^\d/) ? "CN" : a.symbol.match(/^\d{4}\.HK$/i) ? "HK" : "US",
+          conditionType: a.condition,
+          threshold: a.threshold,
+        }),
+      });
+      const data = await res.json() as { id?: string; error?: string };
+      if (data.id) {
+        setAlerts([...alerts, { id: data.id, ...a, enabled: true }]);
+        toast.success("提醒已创建");
+      } else {
+        toast.error(data.error || "创建失败");
+      }
+    } catch { toast.error("网络错误"); }
   };
 
-  const handleDeleteAlert = (id: string) => {
-    setAlerts(alerts.filter((a) => a.id !== id));
-    toast.success("提醒已删除");
+  const handleDeleteAlert = async (id: string) => {
+    try {
+      await fetch(`/api/alerts?id=${id}`, { method: "DELETE" });
+      setAlerts(alerts.filter((a) => a.id !== id));
+      toast.success("提醒已删除");
+    } catch { toast.error("网络错误"); }
   };
 
-  const handleToggleAlert = (id: string) => {
-    setAlerts(alerts.map((a) => a.id === id ? { ...a, enabled: !a.enabled } : a));
-    toast.success("提醒状态已更新");
+  const handleToggleAlert = async (id: string) => {
+    const alert = alerts.find((a) => a.id === id);
+    if (!alert) return;
+    const newEnabled = !alert.enabled;
+    // Optimistic update
+    setAlerts(alerts.map((a) => a.id === id ? { ...a, enabled: newEnabled } : a));
+    try {
+      await fetch(`/api/alerts/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: newEnabled ? 1 : 0 }),
+      });
+    } catch {
+      // Revert on error
+      setAlerts(alerts.map((a) => a.id === id ? { ...a, enabled: !newEnabled } : a));
+      toast.error("更新失败");
+    }
   };
 
   const handleSaveDataSource = () => {
@@ -58,18 +138,30 @@ export function SettingsTab() {
   const handleTestConnection = async () => {
     setTesting(true);
     try {
-      const res = await fetch(`/api/price?symbol=AAPL&market=US`);
-      const data = await res.json() as { price?: number | null; source?: string };
-      if (data.price) {
-        toast.success(`测试成功: AAPL = $${data.price} (${data.source})`);
+      const res = await fetch("/api/test-connection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ appKey: lbKey, appSecret: lbSecret, accessToken: lbAccessToken }),
+      });
+      const data = await res.json() as { success: boolean; price?: number; symbol?: string; error?: string };
+      if (data.success && data.price) {
+        toast.success(`测试成功: ${data.symbol} = $${data.price}`);
       } else {
-        toast.error("测试失败: 无法获取价格，请检查数据源配置");
+        toast.error(data.error || "测试失败: 无法获取价格，请检查数据源配置");
       }
     } catch {
       toast.error("测试失败: 网络错误");
     }
     setTesting(false);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-6 w-6 text-zinc-500 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -104,9 +196,6 @@ export function SettingsTab() {
                     <TableCell className="font-mono">{a.leverage}x</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-500 hover:text-zinc-300">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-500 hover:text-red-400" onClick={() => handleDeleteAccount(a.id)}>
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -194,7 +283,8 @@ export function SettingsTab() {
               <Label className="text-zinc-400 text-xs">长桥 API 参数</Label>
               <Input className="bg-zinc-900 border-zinc-700 h-9 text-sm" placeholder="App Key" type="password" value={lbKey} onChange={(e) => setLbKey(e.target.value)} />
               <Input className="bg-zinc-900 border-zinc-700 h-9 text-sm" placeholder="App Secret" type="password" value={lbSecret} onChange={(e) => setLbSecret(e.target.value)} />
-              <p className="text-xs text-zinc-600">从长桥开放平台获取: open.longbridge.com</p>
+              <Input className="bg-zinc-900 border-zinc-700 h-9 text-sm" placeholder="Access Token" type="password" value={lbAccessToken} onChange={(e) => setLbAccessToken(e.target.value)} />
+              <p className="text-xs text-zinc-600">从长桥开放平台获取 App Key、App Secret 和 Access Token</p>
             </div>
           )}
 

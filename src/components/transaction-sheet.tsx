@@ -63,6 +63,13 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
 
   const isValid = form.accountId && form.symbol && form.quantity && form.price;
 
+  const missingFields = [
+    !form.accountId && "账户",
+    !form.symbol && "代码",
+    !form.quantity && "数量",
+    !form.price && "价格",
+  ].filter(Boolean) as string[];
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="bg-zinc-950 border-zinc-800 text-zinc-100 sm:max-w-md">
@@ -141,6 +148,11 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave }: Props
           </div>
 
           <Button onClick={handleSubmit} disabled={!isValid} className="w-full mt-4">保存交易</Button>
+          {!isValid && missingFields.length > 0 && (
+            <p className="text-xs text-amber-400/80 text-center">
+              请填写: {missingFields.join("、")}
+            </p>
+          )}
         </div>
       </SheetContent>
     </Sheet>

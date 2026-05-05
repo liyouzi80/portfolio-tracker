@@ -1,19 +1,39 @@
 "use client";
 
+import { useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { format, subDays } from "date-fns";
 
-const days = 90;
-const seed = Array.from({ length: days }, (_, i) => {
-  const date = subDays(new Date(), days - i - 1);
-  const base = 250000 + i * 200 + Math.sin(i / 8) * 15000 + Math.random() * 5000;
-  return { date: format(date, "MM/dd"), value: Math.round(base) };
-});
+function seededRandom(seed: number): () => number {
+  return () => {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
 
-export function NetValueChart() {
+function generateNetValue(days: number, baseValue: number) {
+  if (baseValue <= 0) return [];
+  const rng = seededRandom(Math.round(baseValue) + days * 17);
+  let current = baseValue;
+  return Array.from({ length: days }, (_, i) => {
+    const date = subDays(new Date(), days - i - 1);
+    current = current + (rng() - 0.48) * current * 0.015;
+    return { date: format(date, "MM/dd"), value: Math.round(current) };
+  });
+}
+
+export function NetValueChart({ baseValue }: { baseValue: number }) {
+  const data = useMemo(() => generateNetValue(90, baseValue || 250000), [baseValue]);
+
+  if (data.length === 0) {
+    return <p className="text-zinc-500 text-sm text-center py-12">暂无净值数据</p>;
+  }
+
   return (
     <ResponsiveContainer width="100%" height={260}>
-      <AreaChart data={seed}>
+      <AreaChart data={data}>
         <defs>
           <linearGradient id="netValueGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#34d399" stopOpacity={0.3} />

@@ -9,10 +9,13 @@ import {
 
 export const runtime = "edge";
 
+let tableEnsured = false;
 async function ensureTable(db: ReturnType<typeof getDb>) {
+  if (tableEnsured) return;
   await (db as any).run(
     "CREATE TABLE IF NOT EXISTS auth (key TEXT PRIMARY KEY, value TEXT)"
   );
+  tableEnsured = true;
 }
 
 async function getValue(db: ReturnType<typeof getDb>, key: string): Promise<string | null> {
@@ -59,7 +62,9 @@ export async function POST(req: NextRequest) {
     await setValue(db, "passwordSalt", saltStr);
 
     const token = await createSessionToken();
-    return NextResponse.json({ success: true, token });
+    const res = NextResponse.json({ success: true, token });
+    res.headers.set("Set-Cookie", getSessionCookie(token));
+    return res;
   }
 
   // --- Password Login ---
@@ -74,7 +79,9 @@ export async function POST(req: NextRequest) {
     if (!valid) return NextResponse.json({ error: "密码错误" }, { status: 401 });
 
     const token = await createSessionToken();
-    return NextResponse.json({ success: true, token });
+    const res = NextResponse.json({ success: true, token });
+    res.headers.set("Set-Cookie", getSessionCookie(token));
+    return res;
   }
 
   // --- Passkey Register ---
@@ -97,7 +104,9 @@ export async function POST(req: NextRequest) {
     }
 
     const token = await createSessionToken();
-    return NextResponse.json({ success: true, token });
+    const res = NextResponse.json({ success: true, token });
+    res.headers.set("Set-Cookie", getSessionCookie(token));
+    return res;
   }
 
   // --- Logout ---

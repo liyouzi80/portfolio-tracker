@@ -1,25 +1,60 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db";
-import { alerts } from "@/db/schema";
+import { alerts, assets } from "@/db/schema";
 import { cuid } from "@/lib/cuid";
 import { getPlatformEnv } from "@/lib/env";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 export const runtime = "edge";
 
 export async function GET() {
   const db = getDb(getPlatformEnv().DB);
-  const result = await db.select().from(alerts).all();
+  const result = await db.select({
+    id: alerts.id,
+    conditionType: alerts.conditionType,
+    threshold: alerts.threshold,
+    enabled: alerts.enabled,
+    symbol: assets.symbol,
+    market: assets.market,
+  }).from(alerts)
+    .leftJoin(assets, eq(alerts.assetId, assets.id))
+    .all();
+
   return NextResponse.json(result);
 }
 
 export async function POST(req: NextRequest) {
   const db = getDb(getPlatformEnv().DB);
-  const body = await req.json() as { assetId: string; conditionType: string; threshold: number };
+  const body = await req.json() as { symbol?: string; market?: string; assetId?: string; conditionType: string; threshold: number };
+
+  let assetId = body.assetId;
+  if (!assetId && body.symbol) {
+    // Auto-resolve or create asset by symbol
+    const market = body.market ?? "US";
+    const existing = await db.select().from(assets)
+      .where(and(eq(assets.symbol, body.symbol.toUpperCase()), eq(assets.market, market)))
+      .all();
+    if (existing.length > 0) {
+      assetId = existing[0].id;
+    } else {
+      assetId = cuid();
+      await db.insert(assets).values({
+        id: assetId,
+        symbol: body.symbol.toUpperCase(),
+        name: body.symbol.toUpperCase(),
+        market,
+        currency: market === "HK" ? "HKD" : market === "CN" ? "CNY" : "USD",
+        assetType: "stock",
+      });
+    }
+  }
+
+  if (!assetId) return NextResponse.json({ error: "Missing assetId or symbol" }, { status: 400 });
+
   const id = cuid();
   await db.insert(alerts).values({
     id,
-    assetId: body.assetId,
+    assetId,
     conditionType: body.conditionType,
     threshold: body.threshold,
     enabled: 1,

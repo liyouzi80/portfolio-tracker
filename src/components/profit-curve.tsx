@@ -15,12 +15,24 @@ const periods: { key: Period; label: string }[] = [
   { key: "all", label: "全部" },
 ];
 
-function generateData(days: number) {
+// Simple seeded PRNG (mulberry32) — deterministic output for same seed
+function seededRandom(seed: number): () => number {
+  return () => {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function generateData(days: number, baseValue: number, seedOffset: number) {
+  if (baseValue <= 0) return [];
+  const rng = seededRandom(Math.round(baseValue) + seedOffset + days * 31);
   let cum = 0;
   return Array.from({ length: days }, (_, i) => {
     const date = subDays(new Date(), days - i - 1);
-    const pct = (Math.random() - 0.45) * 3;
-    const value = Math.round(pct * 285000 / 100);
+    const pct = (rng() - 0.45) * 3;
+    const value = Math.round(pct * baseValue / 100);
     cum += value;
     return { date: format(date, "MM/dd"), value, cum };
   });
@@ -34,11 +46,22 @@ const periodDays: Record<Period, number> = {
   ytd: ytdStart,
   all: 365,
 };
+const periodSeeds: Record<Period, number> = {
+  "1m": 1,
+  "3m": 2,
+  "6m": 3,
+  ytd: 4,
+  all: 5,
+};
 
-export function ProfitCurve() {
+export function ProfitCurve({ baseValue }: { baseValue: number }) {
   const [period, setPeriod] = useState<Period>("3m");
 
-  const data = useMemo(() => generateData(periodDays[period]), [period]);
+  // Use key to keep the chart stable on period switch (useMemo tracks deps)
+  const data = useMemo(
+    () => generateData(periodDays[period], baseValue || 285000, periodSeeds[period]),
+    [period, baseValue],
+  );
 
   return (
     <div>

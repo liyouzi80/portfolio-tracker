@@ -56,8 +56,9 @@ export async function GET(req: NextRequest) {
         existing.totalCost += txn.quantity * txn.price + (txn.fee ?? 0);
         existing.totalFee += txn.fee ?? 0;
       } else if (txn.type === "sell") {
+        const avgCost = existing.quantity > 0 ? existing.totalCost / existing.quantity : 0;
         existing.quantity -= txn.quantity;
-        existing.totalCost -= txn.quantity * txn.price;
+        existing.totalCost -= txn.quantity * avgCost;
       }
 
       if (existing.quantity > 0.0001) {
@@ -68,7 +69,10 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const holdings = Array.from(holdingsMap.values());
+  const holdings = Array.from(holdingsMap.values()).map((h) => ({
+    ...h,
+    avgCost: h.quantity > 0 ? h.totalCost / h.quantity : 0,
+  }));
 
   // Fetch exchange rates
   const rates = await db.select().from(exchangeRates)

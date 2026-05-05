@@ -4,13 +4,15 @@ import { useState, useCallback } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Upload, FileText } from "lucide-react";
+import { toast } from "sonner";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onDone?: () => void;
 }
 
-export function ImportSheet({ open, onOpenChange }: Props) {
+export function ImportSheet({ open, onOpenChange, onDone }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
 
@@ -22,7 +24,22 @@ export function ImportSheet({ open, onOpenChange }: Props) {
   const handleImport = async () => {
     if (!file) return;
     setImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/transactions/import", { method: "POST", body: formData });
+      const data = await res.json() as { count?: number; error?: string };
+      if (data.count !== undefined) {
+        toast.success(`成功导入 ${data.count} 条记录`);
+        onDone?.();
+      } else {
+        toast.error(data.error || "导入失败");
+      }
+    } catch {
+      toast.error("导入失败: 网络错误");
+    }
     setImporting(false);
+    setFile(null);
     onOpenChange(false);
   };
 

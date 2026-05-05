@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { TransactionSheet } from "./transaction-sheet";
 import { ImportSheet } from "./import-sheet";
-import { Plus, Upload, Search } from "lucide-react";
+import { Plus, Upload, Search, Trash2, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface Txn { id: string; symbol: string; type: string; quantity: number; price: number; fee: number; date: string; market: string; currency: string }
 
@@ -28,14 +29,59 @@ const typeColors: Record<string, string> = {
 
 export function TransactionsTab() {
   const [txns, setTxns] = useState<Txn[]>([]);
+  const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const loadTxns = useCallback(async () => {
+    try {
+      const res = await fetch("/api/transactions");
+      const data = await res.json() as Array<{
+        transactions: { id: string; type: string; quantity: number; price: number; fee: number; date: string };
+        assets: { symbol: string; market: string; currency: string } | null;
+      }>;
+      const mapped: Txn[] = data.map((row) => ({
+        id: row.transactions.id,
+        symbol: row.assets?.symbol ?? "?",
+        type: row.transactions.type,
+        quantity: row.transactions.quantity,
+        price: row.transactions.price,
+        fee: row.transactions.fee ?? 0,
+        date: row.transactions.date,
+        market: row.assets?.market ?? "US",
+        currency: row.assets?.currency ?? "USD",
+      }));
+      setTxns(mapped);
+    } catch {
+      // silently ignore fetch errors
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadTxns(); }, [loadTxns]);
+
+  const handleDelete = async (id: string) => {
+    setDeleting(id);
+    try {
+      await fetch(`/api/transactions?id=${id}`, { method: "DELETE" });
+      setTxns((prev) => prev.filter((t) => t.id !== id));
+      toast.success("交易记录已删除");
+    } catch {
+      toast.error("删除失败");
+    }
+    setDeleting(null);
+  };
 
   const handleSaveTxn = (t: { accountId: string; symbol: string; market: string; type: string; quantity: number; price: number; fee: number; date: string }) => {
     const acc = accounts.find((a) => a.id === t.accountId);
     setTxns([{ id: Date.now().toString(36), ...t, currency: acc?.currency ?? "USD" }, ...txns]);
+  };
+
+  const handleImportDone = () => {
+    loadTxns();
   };
 
   const filtered = txns.filter((t) => {
@@ -86,49 +132,71 @@ export function TransactionsTab() {
       </CardHeader>
 
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow className="border-zinc-800 hover:bg-transparent">
-              <TableHead className="text-zinc-500">日期</TableHead>
-              <TableHead className="text-zinc-500">代码</TableHead>
-              <TableHead className="text-zinc-500">类型</TableHead>
-              <TableHead className="text-zinc-500 text-right">数量</TableHead>
-              <TableHead className="text-zinc-500 text-right">价格</TableHead>
-              <TableHead className="text-zinc-500 text-right">手续费</TableHead>
-              <TableHead className="text-zinc-500 text-right">总额</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.map((t) => (
-              <TableRow key={t.id} className="border-zinc-800">
-                <TableCell className="text-zinc-300">{t.date}</TableCell>
-                <TableCell className="font-mono font-medium">{t.symbol}</TableCell>
-                <TableCell>
-                  <Badge variant="outline" className={typeColors[t.type] ?? "border-zinc-700"}>
-                    {typeLabels[t.type] ?? t.type}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right font-mono">{t.quantity}</TableCell>
-                <TableCell className="text-right font-mono">{t.currency} {t.price.toFixed(2)}</TableCell>
-                <TableCell className="text-right font-mono text-zinc-500">{t.currency} {t.fee.toFixed(2)}</TableCell>
-                <TableCell className="text-right font-mono">
-                  {t.currency} {(t.quantity * t.price + t.fee).toLocaleString()}
-                </TableCell>
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 text-zinc-500 animate-spin" />
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className="border-zinc-800 hover:bg-transparent">
+                <TableHead className="text-zinc-500">日期</TableHead>
+                <TableHead className="text-zinc-500">代码</TableHead>
+                <TableHead className="text-zinc-500">类型</TableHead>
+                <TableHead className="text-zinc-500 text-right">数量</TableHead>
+                <TableHead className="text-zinc-500 text-right">价格</TableHead>
+                <TableHead className="text-zinc-500 text-right">手续费</TableHead>
+                <TableHead className="text-zinc-500 text-right">总额</TableHead>
+                <TableHead className="text-zinc-500 w-10" />
               </TableRow>
-            ))}
-            {filtered.length === 0 && (
-              <TableRow className="border-zinc-800">
-                <TableCell colSpan={7} className="text-center text-zinc-500 py-8">
-                  暂无交易记录
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((t) => (
+                <TableRow key={t.id} className="border-zinc-800">
+                  <TableCell className="text-zinc-300">{t.date}</TableCell>
+                  <TableCell className="font-mono font-medium">{t.symbol}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={typeColors[t.type] ?? "border-zinc-700"}>
+                      {typeLabels[t.type] ?? t.type}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right font-mono">{t.quantity}</TableCell>
+                  <TableCell className="text-right font-mono">{t.currency} {t.price.toFixed(2)}</TableCell>
+                  <TableCell className="text-right font-mono text-zinc-500">{t.currency} {t.fee.toFixed(2)}</TableCell>
+                  <TableCell className="text-right font-mono">
+                    {t.currency} {(t.quantity * t.price + t.fee).toLocaleString()}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-zinc-500 hover:text-red-400"
+                      disabled={deleting === t.id}
+                      onClick={() => handleDelete(t.id)}
+                    >
+                      {deleting === t.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {filtered.length === 0 && !loading && (
+                <TableRow className="border-zinc-800">
+                  <TableCell colSpan={8} className="text-center text-zinc-500 py-8">
+                    暂无交易记录
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        )}
       </CardContent>
 
       <TransactionSheet open={sheetOpen} onOpenChange={setSheetOpen} accounts={accounts} onSave={handleSaveTxn} />
-      <ImportSheet open={importOpen} onOpenChange={setImportOpen} />
+      <ImportSheet open={importOpen} onOpenChange={setImportOpen} onDone={handleImportDone} />
     </Card>
   );
 }

@@ -8,13 +8,6 @@ const SECRET_KEY = process.env.JWT_SECRET
 
 const COOKIE_NAME = "pt-session";
 
-function getSecretKey(): Uint8Array {
-  if (SECRET_KEY) return SECRET_KEY;
-  // Dev fallback — generates fresh key per deploy, all sessions invalidate on restart
-  // This is acceptable for a single-user personal app
-  return new TextEncoder().encode("pt-dev-" + (globalThis as any).__PT_SECRET__);
-}
-
 // Initialize dev secret once per cold start
 if (!SECRET_KEY) {
   (globalThis as any).__PT_SECRET__ = (globalThis as any).__PT_SECRET__

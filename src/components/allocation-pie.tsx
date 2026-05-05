@@ -2,14 +2,21 @@
 
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 
-const data = [
-  { name: "美股", value: 45000, color: "#3b82f6" },
-  { name: "港股", value: 152000, color: "#f59e0b" },
-  { name: "A股", value: 178000, color: "#ef4444" },
-  { name: "现金", value: 10000, color: "#71717a" },
-];
+interface AllocationItem { name: string; value: number; color: string }
 
-export function AllocationPie() {
+const marketColors: Record<string, string> = {
+  US: "#3b82f6",
+  HK: "#f59e0b",
+  CN: "#ef4444",
+};
+
+const marketLabels: Record<string, string> = { US: "美股", HK: "港股", CN: "A股" };
+
+export function AllocationPie({ data }: { data: AllocationItem[] }) {
+  if (data.length === 0) {
+    return <p className="text-zinc-500 text-sm text-center py-8">暂无持仓数据</p>;
+  }
+
   return (
     <div>
       <ResponsiveContainer width="100%" height={200}>

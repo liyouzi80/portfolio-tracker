@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 interface TickerItem {
@@ -9,18 +9,37 @@ interface TickerItem {
   change: number | null;
 }
 
-const demoData: TickerItem[] = [
-  { symbol: "AAPL", price: 195.83, change: 1.2 },
-  { symbol: "0700", price: 385.40, change: -0.8 },
-  { symbol: "600519", price: 1792.00, change: 2.1 },
-  { symbol: "TSLA", price: 245.60, change: -1.5 },
-  { symbol: "SPY", price: 530.20, change: 0.3 },
-  { symbol: "BTC", price: 68500, change: 3.7 },
+const referenceSymbols = [
+  { symbol: "AAPL", market: "US" },
+  { symbol: "0700", market: "HK" },
+  { symbol: "600519", market: "CN" },
+  { symbol: "TSLA", market: "US" },
+  { symbol: "SPY", market: "US" },
 ];
 
+const fallbackData: TickerItem[] = referenceSymbols.map((s) => ({
+  symbol: s.symbol,
+  price: null,
+  change: null,
+}));
+
 export function PriceTicker() {
-  const [items] = useState<TickerItem[]>(demoData);
+  const [items, setItems] = useState<TickerItem[]>(fallbackData);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    Promise.all(
+      referenceSymbols.map(async ({ symbol, market }) => {
+        try {
+          const res = await fetch(`/api/price?symbol=${symbol}&market=${market}`);
+          const data = await res.json() as { price?: number | null };
+          return { symbol, price: data.price ?? null, change: null };
+        } catch {
+          return { symbol, price: null, change: null };
+        }
+      })
+    ).then(setItems);
+  }, []);
 
   return (
     <div className="border-b border-zinc-800 bg-zinc-900/80 overflow-hidden">
@@ -28,7 +47,9 @@ export function PriceTicker() {
         {[...items, ...items].map((item, i) => (
           <div key={`${item.symbol}-${i}`} className="inline-flex items-center gap-2 px-4 py-2 text-sm">
             <span className="font-mono font-medium">{item.symbol}</span>
-            <span className="text-zinc-300">{item.price?.toLocaleString()}</span>
+            <span className="text-zinc-300">
+              {item.price !== null ? item.price.toLocaleString() : "--"}
+            </span>
             {item.change !== null && (
               <span className={`flex items-center gap-0.5 text-xs ${item.change > 0 ? 'text-emerald-400' : item.change < 0 ? 'text-red-400' : 'text-zinc-500'}`}>
                 {item.change > 0 ? <TrendingUp className="h-3 w-3" /> : item.change < 0 ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}

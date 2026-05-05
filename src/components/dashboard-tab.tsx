@@ -1,13 +1,35 @@
 "use client";
 
-import { useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { HoldingsTable } from "./holdings-table";
 import { NetValueChart } from "./net-value-chart";
 import { AllocationPie } from "./allocation-pie";
 import { ProfitCurve } from "./profit-curve";
+import { Loader2 } from "lucide-react";
 
-const emptyHoldings: any[] = [];
+interface Holding {
+  assetId: string;
+  symbol: string;
+  name: string;
+  market: string;
+  currency: string;
+  quantity: number;
+  totalCost: number;
+  totalFee: number;
+  avgCost: number;
+}
+
+interface PortfolioData {
+  baseCurrency: string;
+  totalValue: number;
+  totalValueFormatted: string;
+  holdings: Holding[];
+  rates: Record<string, number>;
+}
+
+const marketLabels: Record<string, string> = { US: "美股", HK: "港股", CN: "A股" };
+const marketColors: Record<string, string> = { US: "#3b82f6", HK: "#f59e0b", CN: "#ef4444" };
 
 function MetricCard({ label, value, sub, accent, delay }: { label: string; value: string; sub?: string; accent?: boolean; delay: number }) {
   return (
@@ -26,22 +48,55 @@ function MetricCard({ label, value, sub, accent, delay }: { label: string; value
 }
 
 export function DashboardTab() {
-  const totalPL = useMemo(() => {
-    const currentTotal = 0;
-    return { value: 0, pct: "0.00" };
+  const [data, setData] = useState<PortfolioData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/portfolio?baseCurrency=CNY")
+      .then((r) => r.json() as Promise<PortfolioData>)
+      .then((d) => { setData(d); setLoading(false); })
+      .catch(() => { setError("加载失败"); setLoading(false); });
   }, []);
 
-  const ytdValue = useMemo(() => ({ value: 48500, pct: "20.51" }), []);
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-6 w-6 text-zinc-500 animate-spin" />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return <p className="text-zinc-500 text-sm text-center py-20">{error || "暂无数据"}</p>;
+  }
+
+  const totalValue = data.totalValue;
+  const holdingsCount = data.holdings.length;
+  const markets = new Set(data.holdings.map((h) => h.market));
+  const marketCount = markets.size;
+
+  // Build allocation data from holdings grouped by market
+  const allocationMap = new Map<string, number>();
+  for (const h of data.holdings) {
+    const marketTotal = allocationMap.get(h.market) ?? 0;
+    allocationMap.set(h.market, marketTotal + h.totalCost);
+  }
+  const allocationData = Array.from(allocationMap.entries()).map(([market, value]) => ({
+    name: marketLabels[market] ?? market,
+    value,
+    color: marketColors[market] ?? "#71717a",
+  }));
 
   return (
     <div className="space-y-5">
       {/* Row 1: Metric cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <MetricCard label="总资产" value="¥285,000" sub="≈ $39,490 USD" delay={1} />
-        <MetricCard label="今日盈亏" value="+¥2,340" sub="+0.82%" accent delay={2} />
-        <MetricCard label="YTD 收益" value={`+¥${ytdValue.value.toLocaleString()}`} sub={`+${ytdValue.pct}%`} accent delay={3} />
-        <MetricCard label="累计盈亏" value={`+¥${totalPL.value.toLocaleString()}`} sub={`+${totalPL.pct}%`} accent delay={4} />
-        <MetricCard label="持仓数量" value="4" sub="3 个市场" delay={5} />
+        <MetricCard label="总资产" value={`¥${totalValue.toLocaleString()}`} sub="成本计价" delay={1} />
+        <MetricCard label="今日盈亏" value="--" sub="需接入实时价格" delay={2} />
+        <MetricCard label="YTD 收益" value="--" sub="需接入实时价格" delay={3} />
+        <MetricCard label="累计盈亏" value="--" sub="需接入实时价格" accent delay={4} />
+        <MetricCard label="持仓数量" value={holdingsCount.toString()} sub={`${marketCount} 个市场`} delay={5} />
       </div>
 
       {/* Row 2: Profit curve (full width) */}
@@ -50,7 +105,7 @@ export function DashboardTab() {
           <CardTitle className="text-sm font-medium tracking-wide">盈亏走势</CardTitle>
         </CardHeader>
         <CardContent>
-          <ProfitCurve />
+          <ProfitCurve baseValue={totalValue} />
         </CardContent>
       </Card>
 
@@ -61,7 +116,7 @@ export function DashboardTab() {
             <CardTitle className="text-sm font-medium tracking-wide">净值曲线</CardTitle>
           </CardHeader>
           <CardContent>
-            <NetValueChart />
+            <NetValueChart baseValue={totalValue} />
           </CardContent>
         </Card>
 
@@ -70,7 +125,7 @@ export function DashboardTab() {
             <CardTitle className="text-sm font-medium tracking-wide">资产配置</CardTitle>
           </CardHeader>
           <CardContent>
-            <AllocationPie />
+            <AllocationPie data={allocationData} />
           </CardContent>
         </Card>
       </div>
@@ -81,7 +136,7 @@ export function DashboardTab() {
           <CardTitle className="text-sm font-medium tracking-wide">持仓明细</CardTitle>
         </CardHeader>
         <CardContent>
-          <HoldingsTable data={emptyHoldings} />
+          <HoldingsTable data={data.holdings} />
         </CardContent>
       </Card>
     </div>
