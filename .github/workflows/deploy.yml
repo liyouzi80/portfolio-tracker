@@ -18,30 +18,16 @@ jobs:
 
       - run: npx @opennextjs/cloudflare build
 
+      # Deploy the Worker. JWT_SECRET is injected as a Worker secret via the
+      # 'secrets' input (only set if the GitHub secret is non-empty).
+      # Longbridge credentials are configured in-app and stored in D1 — no
+      # need to pass them here.
       - uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
           command: deploy
-
-      # Set Worker secrets individually — only if the secret is non-empty.
-      - name: Set Worker secrets
+          secrets: |
+            JWT_SECRET
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          LONGBRIDGE_APP_KEY: ${{ secrets.LONGBRIDGE_APP_KEY }}
-          LONGBRIDGE_APP_SECRET: ${{ secrets.LONGBRIDGE_APP_SECRET }}
-          LONGBRIDGE_ACCESS_TOKEN: ${{ secrets.LONGBRIDGE_ACCESS_TOKEN }}
-        run: |
-          set_secret() {
-            local name=$1
-            local value=$2
-            if [ -n "$value" ]; then
-              echo "$value" | npx wrangler secret put "$name"
-            fi
-          }
-          set_secret JWT_SECRET             "$JWT_SECRET"
-          set_secret LONGBRIDGE_APP_KEY     "$LONGBRIDGE_APP_KEY"
-          set_secret LONGBRIDGE_APP_SECRET  "$LONGBRIDGE_APP_SECRET"
-          set_secret LONGBRIDGE_ACCESS_TOKEN "$LONGBRIDGE_ACCESS_TOKEN"

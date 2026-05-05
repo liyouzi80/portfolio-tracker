@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPlatformEnv } from "@/lib/env";
-import { fetchYahooPrice, fetchLongbridgePrice } from "@/lib/price";
+import { fetchYahooPrice, fetchLongbridgePrice, getLongbridgeCredsFromD1 } from "@/lib/price";
 
 export const runtime = "edge";
 
@@ -11,19 +11,20 @@ export async function GET(req: NextRequest) {
 
   if (!symbol) return NextResponse.json({ error: "Missing symbol" }, { status: 400 });
 
-  const { PRICE_CACHE } = getPlatformEnv();
+  const { PRICE_CACHE, DB } = getPlatformEnv();
   const cacheKey = `price:${market}:${symbol}`;
 
   // Return cached price if fresh
   const cached = await PRICE_CACHE.get(cacheKey, "json");
   if (cached) return NextResponse.json(cached);
 
-  // Try Longbridge first, then Yahoo as fallback
+  // Try Longbridge first (env vars or D1-stored credentials), then Yahoo as fallback
   let price: number | null = null;
   let source = "none";
 
   try {
-    price = await fetchLongbridgePrice(symbol, market);
+    const d1Creds = await getLongbridgeCredsFromD1(DB);
+    price = await fetchLongbridgePrice(symbol, market, d1Creds ?? undefined);
     if (price !== null) source = "longbridge";
   } catch {
     // Longbridge not configured or failed — try Yahoo

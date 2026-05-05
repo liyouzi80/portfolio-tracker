@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -55,10 +55,25 @@ export function SettingsTab() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [accountOpen, setAccountOpen] = useState(false);
   const [alertOpen, setAlertOpen] = useState(false);
-  const [dataSource, setDataSource] = useState("longbridge");
+  const [dataSource, setDataSource] = useState("yahoo");
   const [lbKey, setLbKey] = useState("");
   const [lbSecret, setLbSecret] = useState("");
+  const [lbAccessToken, setLbAccessToken] = useState("");
+  const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((r) => r.ok ? r.json() as Promise<{ dataSource: string; lbKey: string; lbSecret: string; lbAccessToken: string }> : null)
+      .then((d) => {
+        if (!d) return;
+        setDataSource(d.dataSource || "yahoo");
+        setLbKey(d.lbKey || "");
+        setLbSecret(d.lbSecret || "");
+        setLbAccessToken(d.lbAccessToken || "");
+      })
+      .catch(() => {});
+  }, []);
   const [registeringPasskey, setRegisteringPasskey] = useState(false);
   const passkeyAvailable = typeof window !== "undefined" && !!window.PublicKeyCredential;
 
@@ -105,19 +120,39 @@ export function SettingsTab() {
     setRegisteringPasskey(false);
   };
 
-  const handleSaveDataSource = () => {
-    toast.success("数据源配置已保存");
+  const handleSaveDataSource = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dataSource, lbKey, lbSecret, lbAccessToken }),
+      });
+      if (res.ok) toast.success("数据源配置已保存");
+      else toast.error("保存失败");
+    } catch {
+      toast.error("网络错误");
+    }
+    setSaving(false);
   };
 
   const handleTestConnection = async () => {
     setTesting(true);
     try {
-      const res = await fetch(`/api/price?symbol=AAPL&market=US`);
-      const data = await res.json() as { price?: number | null; source?: string };
-      if (data.price) {
-        toast.success(`测试成功: AAPL = $${data.price} (${data.source})`);
+      if (dataSource === "longbridge" && lbKey && lbSecret && lbAccessToken) {
+        const res = await fetch("/api/test-connection", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ appKey: lbKey, appSecret: lbSecret, accessToken: lbAccessToken }),
+        });
+        const data = await res.json() as { success: boolean; price?: number; symbol?: string; error?: string };
+        if (data.success && data.price) toast.success(`测试成功: ${data.symbol} = $${data.price}`);
+        else toast.error(data.error || "测试失败");
       } else {
-        toast.error("测试失败: 无法获取价格，请检查数据源配置");
+        const res = await fetch("/api/price?symbol=AAPL&market=US");
+        const data = await res.json() as { price?: number | null; source?: string };
+        if (data.price) toast.success(`测试成功: AAPL = $${data.price} (${data.source})`);
+        else toast.error("测试失败: 无法获取价格");
       }
     } catch {
       toast.error("测试失败: 网络错误");
@@ -281,7 +316,8 @@ export function SettingsTab() {
               <Label className="text-zinc-400 text-xs">长桥 API 参数</Label>
               <Input className="bg-zinc-900 border-zinc-700 h-9 text-sm" placeholder="App Key" type="password" value={lbKey} onChange={(e) => setLbKey(e.target.value)} />
               <Input className="bg-zinc-900 border-zinc-700 h-9 text-sm" placeholder="App Secret" type="password" value={lbSecret} onChange={(e) => setLbSecret(e.target.value)} />
-              <p className="text-xs text-zinc-600">从长桥开放平台获取: open.longbridge.com</p>
+              <Input className="bg-zinc-900 border-zinc-700 h-9 text-sm" placeholder="Access Token" type="password" value={lbAccessToken} onChange={(e) => setLbAccessToken(e.target.value)} />
+              <p className="text-xs text-zinc-600">从长桥开放平台获取: open.longportapp.com</p>
             </div>
           )}
 
@@ -290,9 +326,9 @@ export function SettingsTab() {
               <Zap className="h-3.5 w-3.5 mr-1" />
               {testing ? "测试中..." : "测试连接"}
             </Button>
-            <Button size="sm" onClick={handleSaveDataSource}>
-              <Check className="h-3.5 w-3.5 mr-1" />
-              保存配置
+            <Button size="sm" onClick={handleSaveDataSource} disabled={saving}>
+              {saving ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Check className="h-3.5 w-3.5 mr-1" />}
+              {saving ? "保存中..." : "保存配置"}
             </Button>
           </div>
           <p className="text-xs text-zinc-500">
