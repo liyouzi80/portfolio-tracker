@@ -126,16 +126,27 @@ export async function GET(req: NextRequest) {
         const avgCost = existing.quantity > 0 ? existing.totalCost / existing.quantity : 0;
         const sellValue = txn.quantity * txn.price - (txn.fee ?? 0);
         const costBasis = txn.quantity * avgCost;
-        // realizedPnl recorded in account currency
+        // realizedPnl = (qty × (price - avgCost) - fee) × rate  ← sell fee is deducted from proceeds
         realizedPnl += (sellValue - costBasis) * getRate(asset.currency, acc.currency);
         existing.quantity -= txn.quantity;
         existing.totalCost -= txn.quantity * avgCost;
+        existing.totalFee += txn.fee ?? 0; // track sell fees for reporting
       }
 
       if (existing.quantity > 0.0001) {
         existing.avgCost = existing.quantity > 0 ? existing.totalCost / existing.quantity : 0;
         holdingsMap.set(key, existing);
+      } else if (existing.quantity < -0.0001) {
+        // Short position: negative quantity = liability. Keep in holdings
+        // so it shows as a negative market value in the portfolio.
+        existing.avgCost = existing.totalCost / existing.quantity;
+        holdingsMap.set(key, existing);
       } else {
+        // Position fully closed. Carry any residual cost to realized P&L
+        // to prevent orphaned micro-amounts from accumulating in the database.
+        if (Math.abs(existing.totalCost) > 0.001) {
+          realizedPnl -= existing.totalCost * getRate(asset.currency, acc.currency);
+        }
         holdingsMap.delete(key);
       }
     }
