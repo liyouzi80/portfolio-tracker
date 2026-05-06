@@ -218,7 +218,10 @@ export async function GET(req: NextRequest) {
       const cp = cached?.price;
       const pc = cached?.prevClose;
       const rate = getRate(h.currency, baseCurrency);
-      if (cp && cp > 0) {
+      // Skip if cross-currency rate is unavailable (e.g. rates-fetch never ran
+      // for this currency pair). A 0 rate would silently zero out the holding.
+      const rateMissing = rate === 0 && h.currency !== baseCurrency;
+      if (cp && cp > 0 && !rateMissing) {
         h.currentPrice = cp;
         h.pnl = Math.round((cp - h.avgCost) * h.quantity * 100) / 100;
         h.pnlPct = h.avgCost > 0 ? Math.round((cp - h.avgCost) / h.avgCost * 10000) / 100 : 0;
@@ -230,32 +233,33 @@ export async function GET(req: NextRequest) {
           h.todayPnlInBase = Math.round((cp - pc) * h.quantity * rate * 100) / 100;
         }
       } else {
-        // No real-time price available. NEVER fall back to avgCost — that would
-        // distort market value for holdings with negative cost basis (from
-        // multiple round-trips). Leave P&L fields undefined so the UI shows "--".
+        // No real-time price or cross-currency rate unavailable.
+        // Never fall back to avgCost or 0 — both would distort the books.
         h.currentPrice = undefined;
         h.pnl = undefined;
         h.pnlPct = undefined;
         h.pnlInBase = undefined;
         h.marketValueInBase = undefined;
-        // todayPnl stays undefined (no prevClose → no contribution to portfolio total)
       }
     }
 
-    const accountTotalCost = holdings.reduce(
-      (sum, h) => sum + h.totalCost * getRate(h.currency, acc.currency),
-      0
-    );
-    // Market value: only include holdings with real-time prices.
-    // Holdings without prices contribute 0 to total market value.
-    // This means total market value is a lower bound (conservative).
+    const accountTotalCost = holdings.reduce((sum, h) => {
+      const r = getRate(h.currency, acc.currency);
+      if (r === 0 && h.currency !== acc.currency) return sum; // rate missing → skip
+      return sum + h.totalCost * r;
+    }, 0);
+    // Market value: only include holdings with real-time prices AND valid rates.
     const accountMarketValue = holdings.reduce((sum, h) => {
-      if (h.currentPrice === undefined) return sum; // no price → skip (shows "--" in UI)
-      return sum + h.currentPrice * h.quantity * getRate(h.currency, acc.currency);
+      if (h.currentPrice === undefined) return sum;
+      const r = getRate(h.currency, acc.currency);
+      if (r === 0 && h.currency !== acc.currency) return sum;
+      return sum + h.currentPrice * h.quantity * r;
     }, 0);
     const pricedCost = holdings.reduce((sum, h) => {
       if (h.currentPrice === undefined) return sum;
-      return sum + h.totalCost * getRate(h.currency, acc.currency);
+      const r = getRate(h.currency, acc.currency);
+      if (r === 0 && h.currency !== acc.currency) return sum;
+      return sum + h.totalCost * r;
     }, 0);
 
     // Unrealized P&L only for priced holdings (matched cost vs market value)
@@ -275,23 +279,28 @@ export async function GET(req: NextRequest) {
   }
 
   // ---- Portfolio totals in baseCurrency ----
-  const portfolioCost = accountSummaries.reduce(
-    (s, a) => s + a.totalCost * getRate(a.currency, baseCurrency), 0
-  );
-  const portfolioMarketValue = accountSummaries.reduce(
-    (s, a) => s + (a.totalMarketValue ?? a.totalCost) * getRate(a.currency, baseCurrency), 0
-  );
-  // Total P&L = sum of each account's total P&L (which already contains realized + unrealized)
-  // converted to base currency. This guarantees portfolio total === sum(accounts).
-  const portfolioTotalPnl = accountSummaries.reduce(
-    (s, a) => s + (a.totalPnl ?? 0) * getRate(a.currency, baseCurrency), 0
-  );
-  const portfolioRealizedPnl = accountSummaries.reduce(
-    (s, a) => s + (a.realizedPnl ?? 0) * getRate(a.currency, baseCurrency), 0
-  );
-  const portfolioUnrealizedPnl = accountSummaries.reduce(
-    (s, a) => s + (a.unrealizedPnl ?? 0) * getRate(a.currency, baseCurrency), 0
-  );
+  // All account-level values are already in their account currency.
+  // Convert to baseCurrency, skipping accounts whose rate is unavailable.
+  const portfolioCost = accountSummaries.reduce((s, a) => {
+    const r = getRate(a.currency, baseCurrency);
+    return r === 0 && a.currency !== baseCurrency ? s : s + a.totalCost * r;
+  }, 0);
+  const portfolioMarketValue = accountSummaries.reduce((s, a) => {
+    const r = getRate(a.currency, baseCurrency);
+    return r === 0 && a.currency !== baseCurrency ? s : s + (a.totalMarketValue ?? a.totalCost) * r;
+  }, 0);
+  const portfolioTotalPnl = accountSummaries.reduce((s, a) => {
+    const r = getRate(a.currency, baseCurrency);
+    return r === 0 && a.currency !== baseCurrency ? s : s + (a.totalPnl ?? 0) * r;
+  }, 0);
+  const portfolioRealizedPnl = accountSummaries.reduce((s, a) => {
+    const r = getRate(a.currency, baseCurrency);
+    return r === 0 && a.currency !== baseCurrency ? s : s + (a.realizedPnl ?? 0) * r;
+  }, 0);
+  const portfolioUnrealizedPnl = accountSummaries.reduce((s, a) => {
+    const r = getRate(a.currency, baseCurrency);
+    return r === 0 && a.currency !== baseCurrency ? s : s + (a.unrealizedPnl ?? 0) * r;
+  }, 0);
   const portfolioTodayPnl = accountSummaries.reduce(
     (s, a) => s + a.holdings.reduce((hs, h) => hs + (h.todayPnlInBase ?? 0), 0), 0
   );
