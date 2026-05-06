@@ -130,12 +130,14 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
   const handleSaveTxn = async (t: { id?: string; accountId: string; symbol: string; market: string; type: string; quantity: number; price: number; fee: number; date: string }) => {
     try {
       if (t.id) {
-        // Edit existing — include accountId so user can move txn between accounts
+        // Edit existing — include symbol/market so asset reference can be updated
         const res = await fetch(`/api/transactions/${t.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             accountId: t.accountId,
+            symbol: t.symbol,
+            market: t.market,
             type: t.type,
             quantity: t.quantity,
             price: t.price,
