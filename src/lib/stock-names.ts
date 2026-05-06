@@ -97,7 +97,7 @@ const US_STOCK_CN_NAMES: Record<string, string> = {
   // 其他
   CRCL: "Circle",
   MUU: "美光科技",
-  SNXX: "嘉信理财货币基金",
+  SNXX: "闪迪两倍做多",
   TSLL: "特斯拉两倍做多",
   AMDL: "AMD两倍做多",
   XE: "XE能源基金",
