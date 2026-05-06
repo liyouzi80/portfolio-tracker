@@ -1,6 +1,7 @@
 "use client";
 
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { ChartContainer } from "./chart-container";
+import { AreaSeries, LineSeries } from "lightweight-charts";
 
 interface DataPoint {
   date: string;
@@ -13,29 +14,36 @@ export function NetValueChart({ data, currency = "$" }: { data: DataPoint[]; cur
   }
 
   const fmtAxis = (v: number) => {
-    if (Math.abs(v) >= 1_000_000) return `${currency}${(v / 1_000_000).toFixed(1)}m`;
-    if (Math.abs(v) >= 10_000) return `${currency}${(v / 1000).toFixed(0)}k`;
+    const abs = Math.abs(v);
+    if (abs >= 1_000_000) return `${currency}${(v / 1_000_000).toFixed(1)}m`;
+    if (abs >= 10_000) return `${currency}${(v / 1000).toFixed(0)}k`;
     return `${currency}${v.toFixed(0)}`;
   };
-  const fmtTooltip = (v: number) => `${currency}${Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+
+  const fmtLabel = (v: number) => `${currency}${Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+
+  const chartData = data.map((d) => ({
+    time: d.date,
+    value: d.value,
+  }));
 
   return (
-    <ResponsiveContainer width="100%" height={260}>
-      <AreaChart data={data}>
-        <defs>
-          <linearGradient id="netValueGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#34d399" stopOpacity={0.3} />
-            <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#71717a" }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-        <YAxis tick={{ fontSize: 11, fill: "#71717a" }} tickLine={false} axisLine={false} tickFormatter={fmtAxis} />
-        <Tooltip
-          contentStyle={{ background: "rgba(24,24,27,0.95)", border: "1px solid rgba(63,63,70,0.5)", borderRadius: "8px", fontSize: "13px", color: "#fff" }}
-          formatter={(v) => [fmtTooltip(Number(v)), "净值"]}
-        />
-        <Area type="monotone" dataKey="value" stroke="#34d399" strokeWidth={2} fill="url(#netValueGrad)" />
-      </AreaChart>
-    </ResponsiveContainer>
+    <ChartContainer>
+      {(chart) => {
+        chart.applyOptions({
+          localization: { priceFormatter: (p: number) => fmtLabel(p) },
+        });
+
+        const area = chart.addSeries(AreaSeries, {
+          lineColor: "#34d399",
+          topColor: "rgba(52,211,153,0.3)",
+          bottomColor: "rgba(52,211,153,0)",
+          lineWidth: 2,
+          priceFormat: { type: "custom", formatter: (p: number) => fmtLabel(p) },
+        });
+        area.setData(chartData);
+        chart.timeScale().fitContent();
+      }}
+    </ChartContainer>
   );
 }

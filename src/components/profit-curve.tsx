@@ -1,6 +1,7 @@
 "use client";
 
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { ChartContainer } from "./chart-container";
+import { HistogramSeries, LineSeries } from "lightweight-charts";
 
 interface DataPoint {
   date: string;
@@ -12,30 +13,42 @@ export function ProfitCurve({ data, currency = "$" }: { data: DataPoint[]; curre
     return <p className="text-zinc-500 text-sm text-center py-12">暂无盈亏数据，添加交易记录后开始追踪</p>;
   }
 
-  const fmtAxis = (v: number) => {
-    if (Math.abs(v) >= 1_000_000) return `${currency}${(v / 1_000_000).toFixed(1)}m`;
-    if (Math.abs(v) >= 1000) return `${currency}${(v / 1000).toFixed(0)}k`;
-    return `${currency}${v.toFixed(0)}`;
-  };
-  const fmtTooltip = (v: number) => `${currency}${Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+  const fmtLabel = (v: number) => `${currency}${Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+
+  const chartData = data.map((d) => ({
+    time: d.date,
+    value: d.value,
+    // Color per bar: green above zero, red below
+    color: d.value >= 0 ? "rgba(52,211,153,0.7)" : "rgba(248,113,113,0.7)",
+  }));
 
   return (
-    <ResponsiveContainer width="100%" height={260}>
-      <AreaChart data={data}>
-        <defs>
-          <linearGradient id="profitGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#34d399" stopOpacity={0.2} />
-            <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#71717a" }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-        <YAxis tick={{ fontSize: 10, fill: "#71717a" }} tickLine={false} axisLine={false} tickFormatter={fmtAxis} />
-        <Tooltip
-          contentStyle={{ background: "rgba(24,24,27,0.95)", border: "1px solid rgba(63,63,70,0.5)", borderRadius: "8px", fontSize: "13px", color: "#fff" }}
-          formatter={(v) => [fmtTooltip(Number(v)), "盈亏"]}
-        />
-        <Area type="monotone" dataKey="value" stroke="#34d399" strokeWidth={2} fill="url(#profitGrad)" />
-      </AreaChart>
-    </ResponsiveContainer>
+    <ChartContainer height={260}>
+      {(chart) => {
+        chart.applyOptions({
+          localization: { priceFormatter: (p: number) => fmtLabel(p) },
+        });
+
+        const hist = chart.addSeries(HistogramSeries, {
+          priceFormat: { type: "custom", formatter: (p: number) => fmtLabel(p) },
+        });
+        hist.setData(chartData);
+
+        // Add a zero line for reference
+        const zeroLine = chart.addSeries(LineSeries, {
+          color: "rgba(113,113,122,0.3)",
+          lineWidth: 1,
+          priceFormat: { type: "custom", formatter: (p: number) => fmtLabel(p) },
+        });
+        const firstDate = chartData[0].time;
+        const lastDate = chartData[chartData.length - 1].time;
+        zeroLine.setData([
+          { time: firstDate, value: 0 },
+          { time: lastDate, value: 0 },
+        ]);
+
+        chart.timeScale().fitContent();
+      }}
+    </ChartContainer>
   );
 }
