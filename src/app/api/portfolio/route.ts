@@ -39,6 +39,7 @@ interface AccountSummary {
 interface ChartPoint { date: string; value: number; }
 
 export async function GET(req: NextRequest) {
+  try {
   const db = getDb(getPlatformEnv().DB);
   const { searchParams } = new URL(req.url);
   const baseCurrency = searchParams.get("baseCurrency") ?? "USD";
@@ -289,9 +290,14 @@ export async function GET(req: NextRequest) {
   }
 
   // Snapshots → valueSeries / pnlSeries
-  const snaps = accountId
-    ? await db.select().from(dailySnapshots).where(eq(dailySnapshots.accountId, accountId)).orderBy(asc(dailySnapshots.date)).all()
-    : await db.select().from(dailySnapshots).orderBy(asc(dailySnapshots.date)).all();
+  let snaps: Array<{ date: string; totalCost: number; totalMarketValue: number; currency: string }> = [];
+  try {
+    snaps = (accountId
+      ? await db.select().from(dailySnapshots).where(eq(dailySnapshots.accountId, accountId)).orderBy(asc(dailySnapshots.date)).all()
+      : await db.select().from(dailySnapshots).orderBy(asc(dailySnapshots.date)).all()) as any[];
+  } catch {
+    // daily_snapshots table may not exist yet — valueSeries/pnlSeries will be empty
+  }
 
   const valueByDate = new Map<string, number>();
   const costByDate = new Map<string, number>();
@@ -325,4 +331,8 @@ export async function GET(req: NextRequest) {
     chartData: costSeries, // backward-compat alias，将来可移除
     rates: Object.fromEntries(allRates.map(r => [`${r.fromCurrency}→${r.toCurrency}`, r.rate])),
   });
+  } catch (e: any) {
+    console.error("Portfolio API error:", e?.message ?? e);
+    return NextResponse.json({ error: "Internal server error", message: e?.message ?? String(e) }, { status: 500 });
+  }
 }
