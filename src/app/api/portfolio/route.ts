@@ -205,7 +205,7 @@ export async function GET(req: NextRequest) {
             await PRICE_CACHE.put(
               cacheKey,
               JSON.stringify({ symbol, market, price: data.price, prevClose: (data as any).prevClose, name: data.name, source: "tencent", updatedAt: Date.now() }),
-              { expirationTtl: 900 }
+              { expirationTtl: 86400 } // 24h — price-fetch cron refreshes daily
             );
           } catch { /* ignore */ }
         })

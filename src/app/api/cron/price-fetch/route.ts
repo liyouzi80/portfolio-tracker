@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
         price,
         source,
         updatedAt: Date.now(),
-      }), { expirationTtl: 300 });
+      }), { expirationTtl: 86400 }); // 24h — live prices don't change intraday for most markets
 
       const bestName = cnName || (displayName && displayName !== asset.symbol ? displayName : null);
 
