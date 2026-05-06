@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db";
-import { transactions, assets, accounts, dailySnapshots } from "@/db/schema";
+import { transactions, assets, accounts, dailySnapshots, exchangeRates } from "@/db/schema";
 import { getPlatformEnv } from "@/lib/env";
-import { fetchTencentPrices } from "@/lib/price";
-import { eq, desc } from "drizzle-orm";
+import { fetchTencentPrices, fetchLongbridgePrices } from "@/lib/price";
+import { eq, and, desc } from "drizzle-orm";
 import { cuid } from "@/lib/cuid";
 
 export async function GET(req: NextRequest) {
@@ -13,9 +13,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { DB } = getPlatformEnv();
-  const db = getDb(DB);
+  const { DB: d1 } = getPlatformEnv();
+  const db = getDb(d1);
   const today = new Date().toISOString().slice(0, 10);
+
+  // Ensure rates column exists (schema migration)
+  try {
+    await d1.prepare("ALTER TABLE daily_snapshots ADD COLUMN rates TEXT").run();
+  } catch { /* column already exists */ }
 
   // Check if already snapshotted today
   const existing = await db.select().from(dailySnapshots).where(eq(dailySnapshots.date, today)).all();
@@ -49,8 +54,16 @@ export async function GET(req: NextRequest) {
     const holdings = Array.from(holdingsMap.values());
     if (holdings.length === 0) continue;
 
-    // Fetch current prices
-    const prices = await fetchTencentPrices(holdings.map(h => ({ symbol: h.symbol, market: h.market })));
+    // Fetch current prices — Longbridge for HK, Tencent for CN/US + HK fallback
+    const hkSymbols = holdings.filter(h => h.market === "HK").map(h => ({ symbol: h.symbol, market: h.market }));
+    const otherSymbols = holdings.filter(h => h.market !== "HK").map(h => ({ symbol: h.symbol, market: h.market }));
+
+    const lbPrices = hkSymbols.length > 0 ? await fetchLongbridgePrices(hkSymbols) : new Map();
+    const hkMissed = hkSymbols.filter(s => !lbPrices.has(`${s.market}:${s.symbol}`));
+    const tencentHKFallback = hkMissed.length > 0 ? await fetchTencentPrices(hkMissed) : new Map();
+    const tencentPrices = otherSymbols.length > 0 ? await fetchTencentPrices(otherSymbols) : new Map();
+
+    const prices = new Map([...lbPrices, ...tencentHKFallback, ...tencentPrices]);
     let totalCost = 0;
     let totalMarketValue = 0;
 
@@ -61,12 +74,17 @@ export async function GET(req: NextRequest) {
       totalMarketValue += currentPrice * h.quantity;
     }
 
+    // Capture current exchange rates for accurate historical P&L
+    const rates = await db.select().from(exchangeRates).all();
+    const ratesSnapshot = Object.fromEntries(rates.map(r => [`${r.fromCurrency}→${r.toCurrency}`, r.rate]));
+
     const id = cuid();
     await db.insert(dailySnapshots).values({
       id, date: today, accountId: acc.id,
       totalCost: Math.round(totalCost * 100) / 100,
       totalMarketValue: Math.round(totalMarketValue * 100) / 100,
       currency: acc.currency,
+      rates: JSON.stringify(ratesSnapshot),
       createdAt: new Date().toISOString(),
     });
 

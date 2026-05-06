@@ -315,7 +315,15 @@ export async function GET(req: NextRequest) {
   const valueByDate = new Map<string, number>();
   const costByDate = new Map<string, number>();
   for (const s of snaps) {
-    const rate = getRate(s.currency, baseCurrency);
+    // Prefer snapshot-stored rates for historical accuracy, fall back to current rates
+    let rate = getRate(s.currency, baseCurrency);
+    try {
+      const snapRates = (s as any).rates ? JSON.parse((s as any).rates) as Record<string, number> : null;
+      if (snapRates) {
+        const key = `${s.currency}→${baseCurrency}`;
+        if (snapRates[key] && snapRates[key] > 0) rate = snapRates[key];
+      }
+    } catch { /* use current rate */ }
     valueByDate.set(s.date, (valueByDate.get(s.date) ?? 0) + s.totalMarketValue * rate);
     costByDate.set(s.date, (costByDate.get(s.date) ?? 0) + s.totalCost * rate);
   }

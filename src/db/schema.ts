@@ -57,6 +57,7 @@ export const dailySnapshots = sqliteTable("daily_snapshots", {
   totalCost: real("total_cost").notNull(), // cost basis
   totalMarketValue: real("total_market_value").notNull(), // marked to market
   currency: text("currency").notNull(),
+  rates: text("rates"), // JSON snapshot of exchange rates at capture time
   createdAt: text("created_at").notNull(),
 });
 
