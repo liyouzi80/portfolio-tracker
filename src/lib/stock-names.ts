@@ -97,12 +97,12 @@ const US_STOCK_CN_NAMES: Record<string, string> = {
   // 其他
   CRCL: "Circle",
   MUU: "美光科技",
-  SNXX: "SNXX",
+  SNXX: "嘉信理财货币基金",
   TSLL: "特斯拉两倍做多",
   AMDL: "AMD两倍做多",
-  XE: "XE",
-  MSFL: "MSFL",
-  DRAM: "DRAM",
+  XE: "XE能源基金",
+  MSFL: "微软两倍做多",
+  DRAM: "DRAM半导体ETF",
 };
 
 export function getChineseName(symbol: string, market: string): string | null {
