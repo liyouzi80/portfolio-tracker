@@ -133,9 +133,17 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
     setSearchResults([]);
   };
 
+  const detectMarket = (symbol: string): string => {
+    const s = symbol.replace(/\.(HK|SS|SZ|T|KS|L|DE|PA|MC|AS|MI|SW|TO|AX)$/i, "");
+    if (/^\d{6}$/.test(s)) return "CN";
+    if (/^\d{4,5}$/.test(s)) return "HK";
+    return "US";
+  };
+
   const handleSymbolChange = (value: string) => {
     const clean = value.toUpperCase().replace(/\.(HK|SS|SZ|T|KS|L|DE|PA|MC|AS|MI|SW|TO|AX)$/i, "");
-    setForm({ ...form, symbol: clean });
+    const mkt = detectMarket(value);
+    setForm({ ...form, symbol: clean, market: mkt });
     setSymbolName("");
     setSearchResults([]);
     if (lookupTimer.current) clearTimeout(lookupTimer.current);

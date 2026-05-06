@@ -59,7 +59,10 @@ export async function GET(req: NextRequest) {
     if (!res.ok) return NextResponse.json([]);
     const data = await res.json() as { quotes?: Array<{ symbol: string; shortname?: string; longname?: string; exchDisp?: string; typeDisp?: string; regularMarketPrice?: number }> };
     const results = (data.quotes ?? [])
-      .filter(q => q.typeDisp === "Equity" || q.typeDisp === "ETF")
+      .filter(q => {
+        const t = (q.typeDisp ?? "").toLowerCase();
+        return t === "equity" || t === "etf";
+      })
       .slice(0, 10)
       .map(q => {
         const parsed = parseSymbol(q.symbol);
