@@ -78,7 +78,6 @@ export function PriceTicker() {
         {[...items, ...items].map((item, i) => (
           <div key={`${item.symbol}-${i}`} className="inline-flex items-center gap-2 px-4 py-2 text-sm">
             <span className="text-zinc-400 text-xs">{item.name}</span>
-            <span className="font-mono font-medium">{item.symbol}</span>
             <span className="text-zinc-300">
               {item.price !== null ? item.price.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "--"}
             </span>
