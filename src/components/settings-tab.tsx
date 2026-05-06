@@ -281,7 +281,7 @@ export function SettingsTab() {
       <Card className="t-tab-content t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium">账户管理</CardTitle>
+            <CardTitle className="text-sm font-medium text-zinc-100">账户管理</CardTitle>
             <Button size="sm" variant="outline" className="border-zinc-700 text-zinc-300" onClick={() => { setEditAccount(null); setAccountOpen(true); }}>
               <Plus className="h-4 w-4 mr-1" />添加
             </Button>
@@ -303,9 +303,9 @@ export function SettingsTab() {
               <TableBody>
                 {accounts.map((a) => (
                   <TableRow key={a.id} className="border-zinc-800">
-                    <TableCell className="font-medium">{a.name}</TableCell>
-                    <TableCell><Badge variant="outline" className="border-zinc-700">{a.currency}</Badge></TableCell>
-                    <TableCell className="font-mono">{a.leverage}x</TableCell>
+                    <TableCell className="font-medium text-zinc-100">{a.name}</TableCell>
+                    <TableCell><Badge variant="outline" className="border-zinc-700 text-zinc-100">{a.currency}</Badge></TableCell>
+                    <TableCell className="font-mono text-zinc-100">{a.leverage}x</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-500 hover:text-zinc-300" onClick={() => { setEditAccount(a); setAccountOpen(true); }}>
@@ -328,7 +328,7 @@ export function SettingsTab() {
       <Card className="t-tab-content t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium">价格提醒</CardTitle>
+            <CardTitle className="text-sm font-medium text-zinc-100">价格提醒</CardTitle>
             <Button size="sm" variant="outline" className="border-zinc-700 text-zinc-300" onClick={() => setAlertOpen(true)}>
               <Plus className="h-4 w-4 mr-1" />添加
             </Button>
@@ -351,9 +351,9 @@ export function SettingsTab() {
               <TableBody>
                 {alerts.map((a) => (
                   <TableRow key={a.id} className="border-zinc-800">
-                    <TableCell className="font-mono font-medium">{a.symbol}</TableCell>
+                    <TableCell className="font-mono font-medium text-zinc-100">{a.symbol}</TableCell>
                     <TableCell className="text-zinc-300">{a.condition === "price_below" ? "低于" : "高于"}</TableCell>
-                    <TableCell className="font-mono">{a.threshold}</TableCell>
+                    <TableCell className="font-mono text-zinc-100">{a.threshold}</TableCell>
                     <TableCell>
                       {a.triggeredAt ? (
                         <button onClick={() => handleResetAlert(a.id)} title={`触发于 ${new Date(a.triggeredAt).toLocaleString()}`}>
@@ -385,7 +385,7 @@ export function SettingsTab() {
       {/* Security */}
       <Card className="t-tab-content t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
         <CardHeader>
-          <CardTitle className="text-sm font-medium">安全设置</CardTitle>
+          <CardTitle className="text-sm font-medium text-zinc-100">安全设置</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex items-center justify-between">
@@ -433,13 +433,13 @@ export function SettingsTab() {
       {/* Data Source */}
       <Card className="t-tab-content t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
         <CardHeader>
-          <CardTitle className="text-sm font-medium">数据源配置</CardTitle>
+          <CardTitle className="text-sm font-medium text-zinc-100">数据源配置</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label className="text-zinc-400">主数据源</Label>
             <Select value={dataSource} onValueChange={(v) => v && handleSourceChange(v)}>
-              <SelectTrigger className="bg-zinc-900 border-zinc-700">
+              <SelectTrigger className="bg-zinc-900 border-zinc-700 text-zinc-100">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -468,7 +468,7 @@ export function SettingsTab() {
       {/* Data Export / Escape Hatch */}
       <Card className="t-tab-content t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
         <CardHeader>
-          <CardTitle className="text-sm font-medium">数据备份</CardTitle>
+          <CardTitle className="text-sm font-medium text-zinc-100">数据备份</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-xs text-zinc-500 leading-relaxed">

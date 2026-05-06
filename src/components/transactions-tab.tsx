@@ -201,7 +201,7 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
     <Card className="t-tab-content t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">交易记录</CardTitle>
+          <CardTitle className="text-sm font-medium text-zinc-100">交易记录</CardTitle>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" className="border-zinc-700 text-zinc-300" onClick={() => setImportOpen(true)}>
               <Upload className="h-4 w-4 mr-1" />
@@ -225,7 +225,7 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
             />
           </div>
           <Select value={typeFilter} onValueChange={(v) => v && setTypeFilter(v)}>
-            <SelectTrigger className="w-28 bg-zinc-900 border-zinc-700 h-9 text-sm">
+            <SelectTrigger className="w-28 bg-zinc-900 border-zinc-700 h-9 text-sm text-zinc-100">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

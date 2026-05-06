@@ -46,7 +46,7 @@ export function AccountSheet({ open, onOpenChange, onSave, editAccount }: Props)
           <div className="space-y-2">
             <Label className="text-zinc-400">基准币种</Label>
             <Select value={form.currency} onValueChange={(v) => v && setForm({ ...form, currency: v })}>
-              <SelectTrigger className="bg-zinc-900 border-zinc-700"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="bg-zinc-900 border-zinc-700 text-zinc-100"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="CNY">CNY (¥)</SelectItem>
                 <SelectItem value="HKD">HKD (HK$)</SelectItem>

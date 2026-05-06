@@ -37,7 +37,7 @@ export function AlertSheet({ open, onOpenChange, onSave }: Props) {
           <div className="space-y-2">
             <Label className="text-zinc-400">条件</Label>
             <Select value={form.condition} onValueChange={(v) => v && setForm({ ...form, condition: v })}>
-              <SelectTrigger className="bg-zinc-900 border-zinc-700"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="bg-zinc-900 border-zinc-700 text-zinc-100"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="price_above">价格高于</SelectItem>
                 <SelectItem value="price_below">价格低于</SelectItem>

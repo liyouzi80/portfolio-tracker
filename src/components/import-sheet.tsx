@@ -76,7 +76,7 @@ export function ImportSheet({ open, onOpenChange, accounts, onDone }: Props) {
           <div className="space-y-2">
             <Label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">导入到账户</Label>
             <Select value={accountId} onValueChange={(v) => v && setAccountId(v)}>
-              <SelectTrigger className="bg-zinc-900 border-zinc-700 h-10 text-sm">
+              <SelectTrigger className="bg-zinc-900 border-zinc-700 h-10 text-sm text-zinc-100">
                 <SelectValue placeholder="选择账户..." />
               </SelectTrigger>
               <SelectContent>

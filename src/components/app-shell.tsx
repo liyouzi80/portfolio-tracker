@@ -9,8 +9,57 @@ import { Button } from "@/components/ui/button";
 import { PriceTicker } from "./price-ticker";
 import { LoginScreen } from "./login-screen";
 import { Toaster } from "@/components/ui/sonner";
-import { LogOut, Sun, Moon } from "lucide-react";
+import { LogOut, Sun, Moon, RefreshCw } from "lucide-react";
+import { usePortfolioSummary } from "./use-portfolio-summary";
+import type { PortfolioSummaryHolding } from "./use-portfolio-summary";
 import { toast } from "sonner";
+
+function MarketDataStatus({ holdings, onRefresh, refreshing }: { holdings: PortfolioSummaryHolding[]; onRefresh: () => void; refreshing: boolean }) {
+  if (holdings.length === 0) return null;
+
+  const total = holdings.length;
+  const fresh = holdings.filter(h => h.currentPrice !== undefined && h.currentPrice > 0).length;
+
+  const validTimestamps = holdings
+    .map(h => h.priceUpdatedAt)
+    .filter((t): t is number => typeof t === "number" && t > 0);
+  const latestUpdate = validTimestamps.length > 0 ? Math.max(...validTimestamps) : null;
+
+  const missingSymbols = holdings
+    .filter(h => h.currentPrice === undefined || h.currentPrice <= 0)
+    .map(h => h.symbol);
+  const missingTitle = missingSymbols.length > 0
+    ? `未拿到价格：${missingSymbols.join("、")}`
+    : undefined;
+
+  return (
+    <div className="hidden md:flex items-center gap-1.5 text-xs text-zinc-500">
+      {latestUpdate !== null && (
+        <>
+          <span className="font-mono tabular-nums">
+            {new Date(latestUpdate).toLocaleString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })}
+          </span>
+          <span className="text-zinc-500">·</span>
+          <span
+            className={`font-mono tabular-nums ${fresh < total ? "text-amber-400 cursor-help" : "text-zinc-300"}`}
+            title={missingTitle}
+          >
+            {fresh}/{total}
+          </span>
+        </>
+      )}
+      {latestUpdate === null && <span>暂无行情</span>}
+      <button
+        onClick={onRefresh}
+        disabled={refreshing}
+        className="inline-flex items-center justify-center h-6 w-6 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors disabled:opacity-50"
+        title="手动刷新行情"
+      >
+        <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+      </button>
+    </div>
+  );
+}
 
 export function AppShell() {
   const [tab, setTab] = useState("dashboard");
@@ -87,6 +136,28 @@ export function AppShell() {
     }).catch(() => toast.error("退出失败"));
   }, []);
 
+  const { holdings, reload: reloadSummary } = usePortfolioSummary(unlocked);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const res = await fetch("/api/refresh", { method: "POST" });
+      const data = await res.json() as { success?: boolean; updated?: number; retryAfter?: number; error?: string };
+      if (data.success) {
+        toast.success(`行情已刷新，更新 ${data.updated ?? 0} 个标的`);
+        reloadSummary();
+      } else if (data.retryAfter) {
+        toast.error(`${data.error || "请稍候"}（${data.retryAfter}秒后可重试）`);
+      } else {
+        toast.error(data.error || "刷新失败");
+      }
+    } catch {
+      toast.error("刷新失败: 网络错误");
+    }
+    setRefreshing(false);
+  }, [reloadSummary]);
+
   if (!unlocked) {
     return (
       <>
@@ -114,6 +185,10 @@ export function AppShell() {
               </svg>
               <h1 className="text-lg font-semibold tracking-tight">Portfolio</h1>
             </button>
+
+            {/* Market data status + refresh */}
+            <MarketDataStatus holdings={holdings} onRefresh={handleRefresh} refreshing={refreshing} />
+
             <div className="flex items-center gap-2">
               <TabsList className="bg-zinc-900 border border-zinc-800 text-xs md:text-sm">
                 <TabsTrigger value="dashboard" className="data-[state=active]:bg-zinc-800">

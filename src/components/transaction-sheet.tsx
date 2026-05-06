@@ -217,7 +217,7 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
             <div className="space-y-2">
               <Label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">账户</Label>
               <Select value={form.accountId} onValueChange={(v) => { if (v) setForm({ ...form, accountId: v }); }}>
-                <SelectTrigger className="bg-zinc-900 border-zinc-700 h-11 text-sm">
+                <SelectTrigger className="bg-zinc-900 border-zinc-700 h-11 text-sm text-zinc-100">
                   <SelectValue placeholder="选择账户...">
                     {accounts.find(a => a.id === form.accountId)
                       ? `${accounts.find(a => a.id === form.accountId)!.name} (${accounts.find(a => a.id === form.accountId)!.currency})`
