@@ -16,9 +16,10 @@ export async function GET(req: NextRequest) {
   const db = getDb(d1);
 
   const allAssets = await db.select().from(assets).all();
-  const results: { symbol: string; price: number | null; source: string }[] = [];
 
-  for (const asset of allAssets) {
+  // Fetch all assets in parallel to stay under 30s Worker CPU limit.
+  // Each asset tries 4 sources: Tencent → Longbridge → Finnhub → Yahoo.
+  const fetchResults = await Promise.all(allAssets.map(async (asset) => {
     let price: number | null = null;
     let displayName: string | null = null;
     let source = "none";
@@ -49,64 +50,63 @@ export async function GET(req: NextRequest) {
       } catch { source = "error"; }
     }
 
-    if (price !== null) {
-      // Prefer Chinese name from static mapping for US stocks
-      const cnName = getChineseName(asset.symbol, asset.market);
+    return { asset, price, displayName, source };
+  }));
 
-      const cacheKey = `price:${asset.market}:${asset.symbol}`;
+  // Collect results and batch writes
+  const results: { symbol: string; price: number | null; source: string }[] = [];
+  const kvWrites: Promise<void>[] = [];
+  const dbUpdates: Promise<unknown>[] = [];
+
+  // Ensure columns exist
+  try { await d1.prepare("ALTER TABLE assets ADD COLUMN last_price REAL").run(); } catch { /* exists */ }
+  try { await d1.prepare("ALTER TABLE assets ADD COLUMN last_price_updated_at TEXT").run(); } catch { /* exists */ }
+
+  for (const { asset, price, displayName, source } of fetchResults) {
+    if (price !== null) {
+      const cnName = getChineseName(asset.symbol, asset.market);
       const nameForCache = cnName || (displayName && displayName !== asset.symbol ? displayName : asset.symbol);
-      await PRICE_CACHE.put(cacheKey, JSON.stringify({
-        symbol: asset.symbol,
-        market: asset.market,
-        name: nameForCache,
-        price,
-        source,
-        updatedAt: Date.now(),
-      }), { expirationTtl: 86400 }); // 24h — live prices don't change intraday for most markets
+
+      kvWrites.push(PRICE_CACHE.put(`price:${asset.market}:${asset.symbol}`, JSON.stringify({
+        symbol: asset.symbol, market: asset.market, name: nameForCache, price, source, updatedAt: Date.now(),
+      }), { expirationTtl: 86400 }));
 
       const bestName = cnName || (displayName && displayName !== asset.symbol ? displayName : null);
-
-      // Store name + last known price in assets table for disaster recovery
-      try {
-        // Ensure columns exist
-        await d1.prepare("ALTER TABLE assets ADD COLUMN last_price REAL").run();
-      } catch { /* exists */ }
-      try {
-        await d1.prepare("ALTER TABLE assets ADD COLUMN last_price_updated_at TEXT").run();
-      } catch { /* exists */ }
-
-      try {
-        const setClauses: string[] = [];
-        const setValues: unknown[] = [];
-        if (bestName && bestName !== asset.name) {
-          setClauses.push("name = ?"); setValues.push(bestName);
-        }
-        setClauses.push("last_price = ?"); setValues.push(price);
-        setClauses.push("last_price_updated_at = ?"); setValues.push(new Date().toISOString());
-        await d1.prepare(`UPDATE assets SET ${setClauses.join(", ")} WHERE id = ?`).bind(...setValues, asset.id).run();
-      } catch { /* non-critical */ }
+      if (bestName && bestName !== asset.name) {
+        dbUpdates.push(
+          d1.prepare("UPDATE assets SET name = ?, last_price = ?, last_price_updated_at = ? WHERE id = ?")
+            .bind(bestName, price, new Date().toISOString(), asset.id).run().catch(() => {})
+        );
+      } else {
+        dbUpdates.push(
+          d1.prepare("UPDATE assets SET last_price = ?, last_price_updated_at = ? WHERE id = ?")
+            .bind(price, new Date().toISOString(), asset.id).run().catch(() => {})
+        );
+      }
 
       results.push({ symbol: asset.symbol, price, source });
+    }
+  }
 
-      // Check alerts
-      const assetAlerts = await db.select().from(alerts)
-        .where(eq(alerts.assetId, asset.id))
-        .all();
+  // Wait for all KV and DB writes
+  await Promise.all([...kvWrites, ...dbUpdates]);
 
+  // Check alerts for assets with updated prices
+  for (const { asset, price } of fetchResults) {
+    if (price === null) continue;
+    try {
+      const assetAlerts = await db.select().from(alerts).where(eq(alerts.assetId, asset.id)).all();
       for (const alert of assetAlerts) {
         if (!alert.enabled) continue;
         let triggered = false;
         if (alert.conditionType === "price_above" && price > alert.threshold) triggered = true;
         if (alert.conditionType === "price_below" && price < alert.threshold) triggered = true;
-        if (alert.conditionType === "change_pct") continue; // Requires historical price tracking (not yet implemented)
-
+        if (alert.conditionType === "change_pct") continue;
         if (triggered) {
-          await db.update(alerts)
-            .set({ triggeredAt: new Date().toISOString(), enabled: 0 })
-            .where(eq(alerts.id, alert.id));
+          await db.update(alerts).set({ triggeredAt: new Date().toISOString(), enabled: 0 }).where(eq(alerts.id, alert.id));
         }
       }
-    }
+    } catch { /* alert check is non-critical */ }
   }
 
   return NextResponse.json({ updated: results.length, results });
