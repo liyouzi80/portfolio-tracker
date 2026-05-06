@@ -57,7 +57,7 @@ export function AccountSheet({ open, onOpenChange, onSave, editAccount }: Props)
           <div className="space-y-2">
             <Label className="text-zinc-400">
               杠杆率
-              <span className="ml-1 text-zinc-600 font-normal">— 用于计算购买力，不影响实际持仓</span>
+              <span className="ml-1 text-zinc-500 font-normal">— 用于计算购买力，不影响实际持仓</span>
             </Label>
             <Input value={form.leverage} onChange={(e) => setForm({ ...form, leverage: e.target.value })} className="bg-zinc-900 border-zinc-700" type="number" min="1" />
           </div>

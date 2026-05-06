@@ -394,7 +394,7 @@ export function SettingsTab() {
               <p className="text-xs text-zinc-500 mt-0.5">注册后可用 Touch ID / Face ID / Windows Hello 解锁</p>
             </div>
             {!passkeyAvailable ? (
-              <span className="text-xs text-zinc-600">此设备不支持</span>
+              <span className="text-xs text-zinc-500">此设备不支持</span>
             ) : hasPasskey ? (
               <Button
                 size="sm"

@@ -12,9 +12,9 @@ interface Props {
 export function EmptyState({ icon, title, description, action, className }: Props) {
   return (
     <div className={cn("flex flex-col items-center justify-center py-16 text-center", className)}>
-      {icon && <div className="mb-3 text-zinc-600">{icon}</div>}
+      {icon && <div className="mb-3 text-zinc-500">{icon}</div>}
       <p className="text-sm font-medium text-zinc-400">{title}</p>
-      {description && <p className="text-xs text-zinc-600 mt-1 max-w-sm">{description}</p>}
+      {description && <p className="text-xs text-zinc-500 mt-1 max-w-sm">{description}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );

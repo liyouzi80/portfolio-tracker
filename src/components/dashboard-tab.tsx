@@ -125,7 +125,7 @@ function MarketDataStatus({ holdings }: { holdings: Holding[] }) {
     <div className="text-xs text-zinc-500 px-1 flex items-center gap-1.5 flex-wrap">
       <span>行情更新：</span>
       <span className={`font-mono tabular-nums ${timeColor}`}>{timeStr}</span>
-      <span className="text-zinc-600">·</span>
+      <span className="text-zinc-500">·</span>
       <span>已更新</span>
       <span
         className={`font-mono tabular-nums ${fresh < total ? "text-amber-400 cursor-help" : "text-zinc-300"}`}
@@ -248,7 +248,7 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[12px] font-medium text-zinc-400">{a.name}</span>
-                  <span className="text-[10px] text-zinc-600 font-mono">{a.currency}</span>
+                  <span className="text-[10px] text-zinc-500 font-mono">{a.currency}</span>
                 </div>
                 <div className="text-lg font-mono font-bold text-zinc-100 tabular-nums">
                   {currencySymbols[a.currency] ?? a.currency + " "}{(a.totalMarketValue ?? a.totalCost).toLocaleString(undefined, { maximumFractionDigits: 0 })}
@@ -258,7 +258,7 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
                 </div>
                 {a.totalCost > 0 && (
                   <div className={`text-[10px] font-mono mt-0.5 ${
-                    a.leverage && ((a.totalMarketValue ?? a.totalCost) / a.totalCost) > a.leverage ? "text-red-400" : "text-zinc-600"
+                    a.leverage && ((a.totalMarketValue ?? a.totalCost) / a.totalCost) > a.leverage ? "text-red-400" : "text-zinc-500"
                   }`}>
                     市值倍率 {((a.totalMarketValue ?? a.totalCost) / a.totalCost).toFixed(2)}x
                     {a.leverage && a.leverage > 1 ? ` / 上限 ${a.leverage}x` : ""}
@@ -333,7 +333,7 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
       </div>
 
       {/* ── Attribution (license requirement) ────────────── */}
-      <p className="text-center text-[10px] text-zinc-700 pb-2">
+      <p className="text-center text-[10px] text-zinc-600 pb-2">
         Charts powered by <a href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noreferrer" className="hover:text-zinc-500 transition-colors">TradingView</a>
       </p>
     </div>

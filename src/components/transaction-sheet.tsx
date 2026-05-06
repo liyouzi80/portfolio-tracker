@@ -253,7 +253,7 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
               {symbolName && !showSearch && !lookingUp && (
                 <p className="text-xs text-emerald-400/80 truncate flex items-center gap-1">
                   <Check className="h-3 w-3 text-emerald-500" /> {symbolName}
-                  <span className="text-zinc-600 ml-1">({form.market} · {marketCurrency[form.market] || "USD"})</span>
+                  <span className="text-zinc-500 ml-1">({form.market} · {marketCurrency[form.market] || "USD"})</span>
                 </p>
               )}
               {showSearch && (
@@ -269,7 +269,7 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="font-mono font-semibold text-white text-sm shrink-0">{r.symbol}</span>
                           <span className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 bg-white/10 text-zinc-400">{r.marketLabel || r.market}</span>
-                          <span className="text-[10px] text-zinc-600">{r.currency}</span>
+                          <span className="text-[10px] text-zinc-500">{r.currency}</span>
                         </div>
                         {r.price && <span className="text-xs text-zinc-400 font-mono shrink-0 ml-2">{r.price.toFixed(2)}</span>}
                       </div>

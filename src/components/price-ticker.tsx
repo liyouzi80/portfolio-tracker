@@ -108,10 +108,10 @@ export function PriceTicker() {
               <span className={`flex items-center gap-0.5 text-xs ${item.change > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                 {item.change > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
                 {item.change > 0 ? '+' : ''}{item.change.toFixed(2)}
-                <span className="text-zinc-600">({item.changePct !== null ? (item.changePct > 0 ? '+' : '') + item.changePct.toFixed(2) + '%' : ''})</span>
+                <span className="text-zinc-500">({item.changePct !== null ? (item.changePct > 0 ? '+' : '') + item.changePct.toFixed(2) + '%' : ''})</span>
               </span>
             ) : (
-              <Minus className="h-3 w-3 text-zinc-600" />
+              <Minus className="h-3 w-3 text-zinc-500" />
             )}
           </div>
         ))}

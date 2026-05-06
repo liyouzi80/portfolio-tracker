@@ -114,7 +114,7 @@ export function HoldingsTable({ data, onSymbolClick }: { data: Holding[]; onSymb
                 href={tradingViewUrl(h.symbol, h.market)}
                 target="_blank"
                 rel="noreferrer"
-                className="text-zinc-600 hover:text-zinc-300 transition-colors"
+                className="text-zinc-500 hover:text-zinc-300 transition-colors"
                 title="在 TradingView 查看"
               >
                 <ExternalLink className="h-3.5 w-3.5" />

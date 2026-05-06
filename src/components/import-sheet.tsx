@@ -111,7 +111,7 @@ export function ImportSheet({ open, onOpenChange, accounts, onDone }: Props) {
               <>
                 <Upload className="h-8 w-8 text-zinc-500 mx-auto mb-2" />
                 <p className="text-sm text-zinc-400">拖拽或选择 CSV/Excel 文件</p>
-                <p className="text-xs text-zinc-600 mt-1">或</p>
+                <p className="text-xs text-zinc-500 mt-1">或</p>
                 <label className="mt-2 inline-block cursor-pointer text-sm text-emerald-400 hover:text-emerald-300">
                   浏览文件
                   <input type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={(e) => handleFile(e.target.files?.[0] ?? null)} />
