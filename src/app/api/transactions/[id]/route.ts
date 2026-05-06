@@ -47,15 +47,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const sql = `UPDATE transactions SET ${setClauses.join(", ")} WHERE id = ?`;
     values.push(id);
-    console.log("PUT SQL:", sql, "values:", JSON.stringify(values));
-
     const result = await d1.prepare(sql).bind(...values).run();
-    console.log("PUT result:", { id, success: result.success, changes: result.meta?.changes });
 
     if (!result.success) return NextResponse.json({ error: "D1 update failed" }, { status: 500 });
     return NextResponse.json({ success: true, changes: result.meta?.changes });
   } catch (e: any) {
-    console.error("PUT transaction error:", e?.message ?? e);
     return NextResponse.json({ error: e?.message ?? "Update failed" }, { status: 500 });
   }
 }

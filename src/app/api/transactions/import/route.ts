@@ -88,9 +88,6 @@ export async function POST(req: NextRequest) {
       migrationsRun = true;
     }
   }
-  if (acctRow.length === 0) {
-    return NextResponse.json({ error: "账户不存在" }, { status: 400 });
-  }
 
   const buffer = await file.arrayBuffer();
   let workbook: XLSX.WorkBook;
@@ -214,12 +211,6 @@ export async function POST(req: NextRequest) {
   );
 
   // ---- Pass 2: insert transactions with dedup ----
-  // Ensure tx_hash column exists
-  if (!migrationsRun) {
-    try { await getPlatformEnv().DB.prepare("ALTER TABLE transactions ADD COLUMN tx_hash TEXT").run(); } catch { /* exists */ }
-    migrationsRun = true;
-  }
-
   const now = new Date().toISOString();
   const { DB: d1 } = getPlatformEnv();
   let inserted = 0;

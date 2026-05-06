@@ -6,11 +6,11 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "portfolio-db"
-database_id = "8e567040-fecb-428d-b75d-e29ce0e73b31"
+database_id = "PLACEHOLDER_D1_ID"
 
 [[kv_namespaces]]
 binding = "PRICE_CACHE"
-id = "86f512e06ba1486dad6ede0080ecf379"
+id = "PLACEHOLDER_KV_ID"
 
 [assets]
 directory = ".open-next/assets"

@@ -27,6 +27,7 @@ export function PriceTicker() {
   useEffect(() => {
     let cancelled = false;
     let symbolsList: Array<{ symbol: string; market: string; name: string }> = [];
+    let cycleCount = 0;
 
     const loadSymbols = async () => {
       try {
@@ -77,7 +78,14 @@ export function PriceTicker() {
     };
 
     loadSymbols().then(loadQuotes);
-    const id = setInterval(loadQuotes, POLL_INTERVAL_MS);
+    const id = setInterval(async () => {
+      cycleCount++;
+      if (cycleCount >= 5) {
+        cycleCount = 0;
+        await loadSymbols();
+      }
+      await loadQuotes();
+    }, POLL_INTERVAL_MS);
     return () => { cancelled = true; clearInterval(id); };
   }, []);
 

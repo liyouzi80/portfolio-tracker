@@ -84,20 +84,7 @@ wrangler kv namespace create PRICE_CACHE
 # 记下输出的 id
 ```
 
-把这两个 ID 填进 `wrangler.toml`：
-
-```toml
-[[d1_databases]]
-binding = "DB"
-database_name = "portfolio-db"
-database_id = "你的-d1-database-id"
-
-[[kv_namespaces]]
-binding = "PRICE_CACHE"
-id = "你的-kv-namespace-id"
-```
-
-提交这次改动到你 fork 的仓库（首次 push 不会跑 Actions，因为 secrets 还没配）。
+把两个 ID 作为 GitHub Secrets（见下一步），**不要**直接写到 `wrangler.toml` 里。`wrangler.toml` 中已预留占位符 `PLACEHOLDER_D1_ID` 和 `PLACEHOLDER_KV_ID`，部署时 GitHub Actions 会自动替换为真实 ID。
 
 ---
 
@@ -109,6 +96,8 @@ id = "你的-kv-namespace-id"
 |---|---|---|
 | `CF_ACCOUNT_ID` | ✅ | Cloudflare 控制台右侧 Account ID |
 | `CF_API_TOKEN` | ✅ | [创建](https://dash.cloudflare.com/profile/api-tokens) → 模板「Edit Cloudflare Workers」 |
+| `CF_D1_DATABASE_ID` | ✅ | 第 2 步 `wrangler d1 create portfolio-db` 输出的 `database_id` |
+| `CF_KV_NAMESPACE_ID` | ✅ | 第 2 步 `wrangler kv namespace create PRICE_CACHE` 输出的 `id` |
 | `JWT_SECRET` | ✅ | session 签名。`openssl rand -hex 32` 生成 |
 | `CRON_SECRET` | ✅ | cron 接口鉴权。`openssl rand -hex 32` 生成 |
 | `WORKER_HOST` | ✅ | 你的 Worker 域名（**不带** `https://`），如 `portfolio.yourdomain.com` 或 `portfolio-tracker.your-account.workers.dev` |
