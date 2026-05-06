@@ -57,9 +57,9 @@ function tradingViewUrl(symbol: string, market: string): string {
 
 export function HoldingsTable({ data, onSymbolClick }: { data: Holding[]; onSymbolClick?: (symbol: string) => void }) {
   return (
-    <div className="overflow-x-auto"><Table>
-      <TableHeader>
-        <TableRow className="border-zinc-800 ">
+    <div className="overflow-auto max-h-[600px]"><Table>
+      <TableHeader className="sticky top-0 z-10 bg-zinc-950/95 backdrop-blur-sm">
+        <TableRow className="border-zinc-800 hover:bg-transparent">
           <TableHead className="text-zinc-500">代码</TableHead>
           <TableHead className="text-zinc-500">名称</TableHead>
           <TableHead className="text-zinc-500">市场</TableHead>

@@ -103,6 +103,12 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
   useEffect(() => { loadData(); }, [loadData]);
   useEffect(() => { if (visible && !loading) loadData(); }, [visible, loading, loadData]);
 
+  useEffect(() => {
+    if (!visible) return;
+    const id = setInterval(() => loadData(), 60_000);
+    return () => clearInterval(id);
+  }, [visible, loadData]);
+
   if (loading) return <DashboardSkeleton />;
 
   if (error || !data) {

@@ -172,6 +172,7 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
       });
       const data = await res.json() as { id?: string; error?: string };
       if (data.id) {
+        loadTxns();
         toast.success("交易已保存");
       } else {
         toast.error(data.error || "保存失败");
@@ -243,9 +244,9 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
             <Loader2 className="h-6 w-6 text-zinc-500 animate-spin" />
           </div>
         ) : (
-          <div className="overflow-x-auto"><Table>
-            <TableHeader>
-              <TableRow className="border-zinc-800 ">
+          <div className="overflow-auto max-h-[70vh]"><Table>
+            <TableHeader className="sticky top-0 z-10 bg-zinc-950/95 backdrop-blur-sm">
+              <TableRow className="border-zinc-800 hover:bg-transparent">
                 <TableHead className="text-zinc-500">日期</TableHead>
                 <TableHead className="text-zinc-500">账户</TableHead>
                 <TableHead className="text-zinc-500">名称</TableHead>

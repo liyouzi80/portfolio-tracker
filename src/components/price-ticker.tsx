@@ -11,58 +11,73 @@ interface TickerItem {
   changePct: number | null;
 }
 
-const POLL_INTERVAL_MS = 60_000; // refresh every 60s
+interface Quote {
+  symbol: string;
+  market: string;
+  name: string;
+  price: number | null;
+  prevClose?: number;
+}
+
+const POLL_INTERVAL_MS = 60_000;
 
 export function PriceTicker() {
   const [items, setItems] = useState<TickerItem[]>([]);
 
   useEffect(() => {
     let cancelled = false;
+    let symbolsList: Array<{ symbol: string; market: string; name: string }> = [];
 
-    const load = async () => {
+    const loadSymbols = async () => {
       try {
         const r = await fetch(`/api/portfolio?baseCurrency=USD`);
         if (!r.ok) return;
         const d = await r.json() as {
-          holdings?: Array<{ symbol: string; name: string; currentPrice?: number; prevClose?: number }>;
+          holdings?: Array<{ symbol: string; market: string; name: string }>;
         };
-        if (cancelled) return;
-
-        // Dedup by symbol
         const seen = new Set<string>();
-        const list: TickerItem[] = [];
+        symbolsList = [];
         for (const h of (d.holdings ?? [])) {
-          if (seen.has(h.symbol)) continue;
-          seen.add(h.symbol);
-          const price = h.currentPrice ?? null;
-          const prev = h.prevClose;
-          const change = (price !== null && prev && prev > 0) ? price - prev : null;
-          const changePct = change !== null && prev ? (change / prev) * 100 : null;
-          list.push({ symbol: h.symbol, name: h.name || h.symbol, price, change, changePct });
+          const k = `${h.symbol}:${h.market}`;
+          if (seen.has(k)) continue;
+          seen.add(k);
+          symbolsList.push({ symbol: h.symbol, market: h.market, name: h.name || h.symbol });
         }
-        // Fallback to SPY when there are no holdings yet
-        if (list.length === 0) {
-          try {
-            const res = await fetch(`/api/price?symbol=SPY&market=US`);
-            const data = await res.json() as { price?: number | null; prevClose?: number | null };
-            const price = data.price ?? null;
-            const prev = data.prevClose ?? null;
-            const change = (price !== null && prev && prev > 0) ? price - prev : null;
-            list.push({
-              symbol: "SPY",
-              name: "标普500ETF",
-              price,
-              change,
-              changePct: change !== null && prev ? (change / prev) * 100 : null,
-            });
-          } catch { /* ignore */ }
-        }
+      } catch { /* ignore */ }
+    };
+
+    const loadQuotes = async () => {
+      if (cancelled) return;
+      if (symbolsList.length === 0) {
+        try {
+          const res = await fetch(`/api/quotes?symbols=SPY:US`);
+          const data = await res.json() as Quote[];
+          if (cancelled) return;
+          if (data.length > 0 && data[0].price) {
+            const q = data[0];
+            const change = q.price && q.prevClose ? q.price - q.prevClose : null;
+            setItems([{ symbol: q.symbol, name: q.name, price: q.price, change, changePct: change && q.prevClose ? (change / q.prevClose) * 100 : null }]);
+          }
+        } catch { /* ignore */ }
+        return;
+      }
+      const param = symbolsList.map(s => `${s.symbol}:${s.market}`).join(",");
+      try {
+        const res = await fetch(`/api/quotes?symbols=${encodeURIComponent(param)}`);
+        const data = await res.json() as Quote[];
+        if (cancelled) return;
+        const list: TickerItem[] = data.map(q => {
+          const ref = symbolsList.find(s => s.symbol === q.symbol && s.market === q.market);
+          const change = q.price !== null && q.prevClose ? q.price - q.prevClose : null;
+          const changePct = change !== null && q.prevClose ? (change / q.prevClose) * 100 : null;
+          return { symbol: q.symbol, name: ref?.name || q.name, price: q.price, change, changePct };
+        });
         setItems(list);
       } catch { /* ignore */ }
     };
 
-    load();
-    const id = setInterval(load, POLL_INTERVAL_MS);
+    loadSymbols().then(loadQuotes);
+    const id = setInterval(loadQuotes, POLL_INTERVAL_MS);
     return () => { cancelled = true; clearInterval(id); };
   }, []);
 
