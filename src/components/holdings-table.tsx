@@ -57,7 +57,7 @@ function tradingViewUrl(symbol: string, market: string): string {
 
 export function HoldingsTable({ data, onSymbolClick }: { data: Holding[]; onSymbolClick?: (symbol: string) => void }) {
   return (
-    <div className="overflow-x-auto md:overflow-auto md:max-h-[600px]"><Table>
+    <div className="overflow-auto max-h-[60vh] md:max-h-[600px]"><Table>
       <TableHeader className="sticky top-0 z-10 bg-zinc-950/95 backdrop-blur-sm">
         <TableRow className="border-zinc-800 hover:bg-transparent">
           <TableHead className="text-zinc-500">代码</TableHead>
@@ -74,7 +74,7 @@ export function HoldingsTable({ data, onSymbolClick }: { data: Holding[]; onSymb
       <TableBody>
         {data.map((h) => (
           <TableRow key={h.assetId} className="border-zinc-800">
-            <TableCell className="font-mono font-medium">
+            <TableCell className="font-mono font-medium text-zinc-100">
               {onSymbolClick ? (
                 <button onClick={() => onSymbolClick(h.symbol)} className="hover:text-emerald-400 transition-colors cursor-pointer">
                   {h.symbol}
@@ -87,8 +87,8 @@ export function HoldingsTable({ data, onSymbolClick }: { data: Holding[]; onSymb
                 {marketLabels[h.market] ?? h.market}
               </Badge>
             </TableCell>
-            <TableCell className="text-right font-mono tabular-nums">{fmtQuantity(h.quantity)}</TableCell>
-            <TableCell className="text-right font-mono tabular-nums">
+            <TableCell className="text-right font-mono tabular-nums text-zinc-100">{fmtQuantity(h.quantity)}</TableCell>
+            <TableCell className="text-right font-mono tabular-nums text-zinc-100">
               {h.currency} {fmtMoney(h.avgCost)}
             </TableCell>
             <TableCell className="text-right font-mono tabular-nums">
@@ -100,7 +100,7 @@ export function HoldingsTable({ data, onSymbolClick }: { data: Holding[]; onSymb
                 <span className="text-zinc-500">--</span>
               )}
             </TableCell>
-            <TableCell className="text-right font-mono tabular-nums">
+            <TableCell className="text-right font-mono tabular-nums text-zinc-100">
               {h.currency} {fmtMoney(h.totalCost)}
             </TableCell>
             <TableCell className={`text-right font-mono tabular-nums ${

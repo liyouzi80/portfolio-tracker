@@ -244,7 +244,7 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
             <Loader2 className="h-6 w-6 text-zinc-500 animate-spin" />
           </div>
         ) : (
-          <div className="overflow-auto max-h-[70vh]"><Table>
+          <div className="overflow-auto max-h-[60vh] md:max-h-[70vh]"><Table>
             <TableHeader className="sticky top-0 z-10 bg-zinc-950/95 backdrop-blur-sm">
               <TableRow className="border-zinc-800 hover:bg-transparent">
                 <TableHead className="text-zinc-500">日期</TableHead>
@@ -265,16 +265,16 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
                   <TableCell className="text-zinc-300">{t.date}</TableCell>
                   <TableCell className="text-zinc-400 text-sm">{t.accountName}</TableCell>
                   <TableCell className="text-zinc-400 text-sm max-w-[120px] truncate">{t.name || t.symbol}</TableCell>
-                  <TableCell className="font-mono font-medium">{t.symbol}</TableCell>
+                  <TableCell className="font-mono font-medium text-zinc-100">{t.symbol}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className={typeColors[t.type] ?? "border-zinc-700"}>
                       {typeLabels[t.type] ?? t.type}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right font-mono tabular-nums">{fmtQuantity(t.quantity)}</TableCell>
-                  <TableCell className="text-right font-mono tabular-nums">{t.currency} {fmtMoney(t.price)}</TableCell>
+                  <TableCell className="text-right font-mono tabular-nums text-zinc-100">{fmtQuantity(t.quantity)}</TableCell>
+                  <TableCell className="text-right font-mono tabular-nums text-zinc-100">{t.currency} {fmtMoney(t.price)}</TableCell>
                   <TableCell className="text-right font-mono tabular-nums text-zinc-500">{t.currency} {fmtMoney(t.fee)}</TableCell>
-                  <TableCell className="text-right font-mono tabular-nums">
+                  <TableCell className="text-right font-mono tabular-nums text-zinc-100">
                     {t.currency} {fmtMoney(t.quantity * t.price + (t.type === "sell" ? -t.fee : t.fee))}
                   </TableCell>
                   <TableCell>
