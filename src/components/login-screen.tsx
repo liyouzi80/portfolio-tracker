@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Fingerprint, KeyRound, Loader2, Sun, Moon } from "lucide-react";
+import { Fingerprint, KeyRound, Loader2 } from "lucide-react";
 
 type Mode = "passkey" | "password" | "setup" | "reset";
 
@@ -37,6 +37,14 @@ async function getPasskeyPRF(): Promise<string> {
   return sha256(bufToB64(prfOutput));
 }
 
+// Mirror of server-side validatePasswordStrength so we can give immediate feedback.
+function validatePassword(password: string, confirm: string): string | null {
+  if (password.length < 8) return "密码至少 8 位";
+  if (/^\d+$/.test(password)) return "密码不能全为数字，请加入字母或符号";
+  if (password !== confirm) return "两次输入不一致";
+  return null;
+}
+
 export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
   const [bgUrl, setBgUrl] = useState("");
   const [bgLoaded, setBgLoaded] = useState(false);
@@ -48,7 +56,7 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Load Bing wallpaper
+  // Bing wallpaper
   useEffect(() => {
     let cancelled = false;
     fetch("/api/bg")
@@ -63,7 +71,7 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
     return () => { cancelled = true; };
   }, []);
 
-  // Check auth status
+  // Auth status
   useEffect(() => {
     fetch("/api/auth")
       .then((r) => {
@@ -77,15 +85,12 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
         setHasPasskey(pk);
         if (pk) setMode("passkey");
       })
-      .catch(() => {
-        setError("服务器错误，请刷新重试");
-      });
+      .catch(() => setError("服务器错误，请刷新重试"));
   }, [onUnlock]);
 
   const doSetup = useCallback(async () => {
-    if (password !== confirm || password.length < 4) {
-      setError("密码至少4位且两次输入一致"); return;
-    }
+    const err = validatePassword(password, confirm);
+    if (err) { setError(err); return; }
     setLoading(true); setError("");
     try {
       const res = await fetch("/api/auth", {
@@ -117,9 +122,8 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
   }, [password, onUnlock]);
 
   const doReset = useCallback(async () => {
-    if (password !== confirm || password.length < 4) {
-      setError("密码至少4位且两次输入一致"); return;
-    }
+    const err = validatePassword(password, confirm);
+    if (err) { setError(err); return; }
     setLoading(true); setError("");
     try {
       const res = await fetch("/api/auth", {
@@ -154,19 +158,15 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
-      {/* Bing Background */}
       <div className="absolute inset-0 bg-zinc-900" />
       <div
         className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000"
         style={{ backgroundImage: bgUrl ? `url(${bgUrl})` : 'none', opacity: bgLoaded ? 1 : 0 }}
       />
-      {/* Overlay */}
       <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" />
 
-      {/* Login Card */}
       <div className="relative w-full max-w-[380px] mx-4">
         <div className="rounded-[32px] p-10 bg-black/30 backdrop-blur-[40px] saturate-[180%] border border-white/[0.08] shadow-[0_32px_80px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.06)]">
-          {/* Logo */}
           <div className="flex justify-center mb-8">
             <svg className="h-12 w-12" viewBox="0 0 32 32" fill="none">
               <rect width="32" height="32" rx="8" fill="url(#login-logo)" />
@@ -186,7 +186,6 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
             {needsSetup ? "设置主密码以保护数据" : mode === "reset" ? "设置新密码以继续" : "解锁以查看持仓"}
           </p>
 
-          {/* Mode Tabs — only shown when passkey is already registered */}
           {!needsSetup && hasPasskey && (
             <div className="flex rounded-xl bg-white/[0.06] p-1 mb-6 border border-white/[0.06]">
               <button
@@ -210,7 +209,6 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
             </div>
           )}
 
-          {/* Passkey unlock */}
           {mode === "passkey" && !needsSetup && hasPasskey && (
             <div className="space-y-4">
               <Button
@@ -227,11 +225,10 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
             </div>
           )}
 
-          {/* Password / Setup */}
           {(mode === "password" || needsSetup) && (
             <div className="space-y-3">
               <div className="space-y-2">
-                <Label className="text-zinc-400 text-xs">{needsSetup ? "设置主密码" : "主密码"}</Label>
+                <Label className="text-zinc-400 text-xs">{needsSetup ? "设置主密码（≥ 8 位，不可纯数字）" : "主密码"}</Label>
                 <Input
                   type="password"
                   value={password}
@@ -265,11 +262,10 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
             </div>
           )}
 
-          {/* Reset password (triggered when server returns needsReset) */}
           {mode === "reset" && (
             <div className="space-y-3">
               <p className="text-xs text-amber-400/80 text-center leading-relaxed">
-                旧密码因安全升级已失效，请重新设置。完成后需重新注册 Passkey（如已注册）。
+                旧密码因安全升级已失效，请重新设置（≥ 8 位，不可纯数字）。完成后需重新注册 Passkey。
               </p>
               <div className="space-y-2">
                 <Label className="text-zinc-400 text-xs">新密码</Label>
@@ -297,18 +293,13 @@ export function LoginScreen({ onUnlock }: { onUnlock: () => void }) {
                 {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                 确认重置
               </Button>
-              <p className="text-xs text-center text-amber-400/80 leading-relaxed">
-                原密码加密格式已过期，需重置一次
-              </p>
             </div>
           )}
 
-          {/* Error */}
           {error && (
             <p className="text-red-400 text-sm text-center mt-4">{error}</p>
           )}
 
-          {/* Warning for setup */}
           {needsSetup && (
             <p className="text-xs text-center text-amber-400/80 mt-6 leading-relaxed">
               密码丢失将无法恢复数据，请妥善保管

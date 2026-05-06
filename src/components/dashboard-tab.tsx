@@ -21,8 +21,13 @@ interface Holding {
   totalFee: number;
   avgCost: number;
   currentPrice?: number;
+  prevClose?: number;
   pnl?: number;
   pnlPct?: number;
+  todayPnl?: number;
+  pnlInBase?: number;
+  todayPnlInBase?: number;
+  marketValueInBase?: number;
 }
 
 interface ChartPoint { date: string; value: number; }
@@ -34,6 +39,8 @@ interface AccountSummary {
   totalCost: number;
   totalMarketValue?: number;
   totalPnl?: number;
+  realizedPnl?: number;
+  unrealizedPnl?: number;
   holdings: Holding[];
 }
 
@@ -42,8 +49,14 @@ interface PortfolioData {
   totalValue: number;
   totalMarketValue?: number;
   totalPnl?: number;
+  todayPnl?: number;
+  realizedPnl?: number;
+  unrealizedPnl?: number;
   accounts: AccountSummary[];
   holdings: Holding[];
+  costSeries?: ChartPoint[];
+  valueSeries?: ChartPoint[];
+  pnlSeries?: ChartPoint[];
   chartData?: ChartPoint[];
   rates: Record<string, number>;
 }
@@ -51,6 +64,13 @@ interface PortfolioData {
 const currencySymbols: Record<string, string> = { CNY: "¥", USD: "$", HKD: "HK$" };
 const marketLabels: Record<string, string> = { US: "美股", HK: "港股", CN: "A股" };
 const marketColors: Record<string, string> = { US: "#6366f1", HK: "#8b5cf6", CN: "#06b6d4" };
+
+const BASE_CURRENCY = "USD"; // single source of truth across the dashboard
+
+function fmtMoney(amount: number, symbol: string): string {
+  const sign = amount < 0 ? "-" : amount > 0 ? "+" : "";
+  return `${sign}${symbol}${Math.abs(amount).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+}
 
 function MetricCard({ label, value, sub, color, delay }: { label: string; value: string; sub?: string; color?: "green" | "red" | "neutral"; delay: number }) {
   const colorClass = color === "green" ? "text-emerald-400" : color === "red" ? "text-red-400" : "";
@@ -77,22 +97,27 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
 
   const loadData = useCallback(async () => {
     try {
-      const r = await fetch("/api/portfolio?baseCurrency=USD");
+      const r = await fetch(`/api/portfolio?baseCurrency=${BASE_CURRENCY}`);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const d = await r.json() as PortfolioData;
       if (!d.holdings) throw new Error("Invalid response");
       setData(d);
       setError(null);
-    } catch { if (!data) setError("加载失败"); }
+    } catch {
+      setData((prev) => {
+        if (!prev) setError("加载失败");
+        return prev;
+      });
+    }
     setLoading(false);
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Re-fetch when tab becomes visible (without remount)
+  // Re-fetch when tab becomes visible
   useEffect(() => {
     if (visible && !loading) loadData();
-  }, [visible]);
+  }, [visible, loading, loadData]);
 
   if (loading) return <DashboardSkeleton />;
 
@@ -107,42 +132,87 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
   }
 
   const cs = currencySymbols[data.baseCurrency] ?? data.baseCurrency;
-  const totalValue = data.totalValue;
-  const totalPnl = data.totalPnl ?? 0;
-  const totalMarketValue = data.totalMarketValue ?? totalValue;
+
+  // All numbers below are already in baseCurrency (computed server-side).
+  const totalCost = data.totalValue;                    // cumulative net invested
+  const totalMarketValue = data.totalMarketValue ?? totalCost;
+  const totalPnl = data.totalPnl ?? 0;                  // realized + unrealized
+  const todayPnl = data.todayPnl ?? 0;                  // (price - prevClose) * qty
+  const realizedPnl = data.realizedPnl ?? 0;
+  const unrealizedPnl = data.unrealizedPnl ?? 0;
+
   const holdingsCount = data.holdings.length;
   const markets = new Set(data.holdings.map((h) => h.market));
   const marketCount = markets.size;
 
-  // Calculate today's P&L approximation from holdings with current prices
-  const holdingsWithPnl = data.holdings.filter(h => h.pnl !== undefined);
-  const todayPnl = holdingsWithPnl.reduce((sum, h) => sum + (h.pnl ?? 0), 0);
-  const pnlSign = totalPnl >= 0 ? "+" : "";
+  const pnlPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
+  const todayPnlPct = totalMarketValue > 0
+    ? (todayPnl / (totalMarketValue - todayPnl)) * 100
+    : 0;
 
-  // Build allocation data from holdings grouped by market
+  // Allocation by market — convert each holding's market value to baseCurrency
   const allocationMap = new Map<string, number>();
   for (const h of data.holdings) {
-    const marketTotal = allocationMap.get(h.market) ?? 0;
-    allocationMap.set(h.market, marketTotal + h.totalCost);
+    const mv = h.marketValueInBase ?? 0;
+    allocationMap.set(h.market, (allocationMap.get(h.market) ?? 0) + mv);
   }
-  const allocationData = Array.from(allocationMap.entries()).map(([market, value]) => ({
-    name: marketLabels[market] ?? market,
-    value,
-    color: marketColors[market] ?? "#71717a",
-  }));
+  const allocationData = Array.from(allocationMap.entries())
+    .filter(([, v]) => v > 0)
+    .map(([market, value]) => ({
+      name: marketLabels[market] ?? market,
+      value: Math.round(value * 100) / 100,
+      color: marketColors[market] ?? "#71717a",
+    }));
+
+  // Chart data: prefer real series, fall back to costSeries placeholder
+  const valueSeries = data.valueSeries && data.valueSeries.length > 0
+    ? data.valueSeries
+    : (data.costSeries ?? []);
+  const pnlSeries = data.pnlSeries && data.pnlSeries.length > 0
+    ? data.pnlSeries
+    : []; // empty triggers ProfitCurve's empty state
 
   return (
     <div className="space-y-5">
-      {/* Row 1: Overall metric cards */}
+      {/* KPI cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-3">
-        <MetricCard label="总资产" value={`${cs}${totalMarketValue.toLocaleString()}`} sub={`成本 ${cs}${totalValue.toLocaleString()}`} color="neutral" delay={1} />
-        <MetricCard label="今日盈亏" value={todayPnl !== 0 ? `${pnlSign}${cs}${Math.abs(todayPnl).toLocaleString()}` : "--"} sub={todayPnl !== 0 ? "基于最新价格" : "价格数据更新中"} color={todayPnl > 0 ? "green" : todayPnl < 0 ? "red" : "neutral"} delay={2} />
-        <MetricCard label="持仓盈亏" value={totalPnl !== 0 ? `${pnlSign}${cs}${Math.abs(totalPnl).toLocaleString()}` : "--"} sub={totalPnl !== 0 ? "浮动盈亏" : "添加价格数据后计算"} color={totalPnl > 0 ? "green" : totalPnl < 0 ? "red" : "neutral"} delay={3} />
-        <MetricCard label="持仓数量" value={holdingsCount.toString()} sub={`${marketCount} 个市场`} delay={4} />
-        <MetricCard label="今日估值" value={`${cs}${totalMarketValue.toLocaleString()}`} sub="基于最新行情" color="neutral" delay={5} />
+        <MetricCard
+          label="总市值"
+          value={`${cs}${totalMarketValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+          sub={`成本 ${cs}${totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+          color="neutral"
+          delay={1}
+        />
+        <MetricCard
+          label="今日盈亏"
+          value={data.todayPnl !== undefined && data.holdings.some(h => h.prevClose) ? fmtMoney(todayPnl, cs) : "--"}
+          sub={data.holdings.some(h => h.prevClose) ? `${todayPnlPct >= 0 ? "+" : ""}${todayPnlPct.toFixed(2)}%` : "等待行情数据"}
+          color={todayPnl > 0 ? "green" : todayPnl < 0 ? "red" : "neutral"}
+          delay={2}
+        />
+        <MetricCard
+          label="累计盈亏"
+          value={fmtMoney(totalPnl, cs)}
+          sub={`${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(2)}%`}
+          color={totalPnl > 0 ? "green" : totalPnl < 0 ? "red" : "neutral"}
+          delay={3}
+        />
+        <MetricCard
+          label="持仓"
+          value={holdingsCount.toString()}
+          sub={`${marketCount} 个市场`}
+          delay={4}
+        />
+        <MetricCard
+          label="已实现盈亏"
+          value={realizedPnl !== 0 ? fmtMoney(realizedPnl, cs) : "--"}
+          sub={`浮动 ${fmtMoney(unrealizedPnl, cs)}`}
+          color={realizedPnl > 0 ? "green" : realizedPnl < 0 ? "red" : "neutral"}
+          delay={5}
+        />
       </div>
 
-      {/* Row 1.5: Per-account totals */}
+      {/* Per-account totals */}
       {data.accounts.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 md:gap-3">
           {data.accounts.map((a) => (
@@ -150,33 +220,35 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
               <CardContent className="py-3">
                 <p className="text-xs text-zinc-500">{a.name}</p>
                 <p className="text-lg font-mono font-bold">
-                  {currencySymbols[a.currency] ?? a.currency + " "}{a.totalCost.toLocaleString()}
+                  {currencySymbols[a.currency] ?? a.currency + " "}{(a.totalMarketValue ?? a.totalCost).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </p>
-                <p className="text-xs text-zinc-600">{a.holdings.length} 个标的</p>
+                <p className={`text-xs font-mono ${(a.totalPnl ?? 0) > 0 ? "text-emerald-400/80" : (a.totalPnl ?? 0) < 0 ? "text-red-400/80" : "text-zinc-600"}`}>
+                  {a.totalPnl !== undefined ? fmtMoney(a.totalPnl, currencySymbols[a.currency] ?? "") : `${a.holdings.length} 个标的`}
+                </p>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
 
-      {/* Row 2: Profit curve (full width) */}
+      {/* Profit curve */}
       <Card className="stagger-6 t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
         <CardHeader className="pb-0">
           <CardTitle className="text-sm font-medium tracking-wide">盈亏走势</CardTitle>
         </CardHeader>
         <CardContent>
-          <ProfitCurve data={data.chartData ?? []} />
+          <ProfitCurve data={pnlSeries} currency={cs} />
         </CardContent>
       </Card>
 
-      {/* Row 3: Net value + Allocation */}
+      {/* Net value + Allocation */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <Card className="md:col-span-2 stagger-7 t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium tracking-wide">净值曲线</CardTitle>
           </CardHeader>
           <CardContent>
-            <NetValueChart data={data.chartData ?? []} />
+            <NetValueChart data={valueSeries} currency={cs} />
           </CardContent>
         </Card>
 
@@ -190,7 +262,7 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
         </Card>
       </div>
 
-      {/* Row 4: Holdings table */}
+      {/* Holdings */}
       <Card className="stagger-8 t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -203,7 +275,7 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
           </div>
         </CardHeader>
         <CardContent>
-          <HoldingsTable data={data.holdings} onSymbolClick={(symbol) => onAddTransaction?.()} />
+          <HoldingsTable data={data.holdings} onSymbolClick={() => onAddTransaction?.()} />
         </CardContent>
       </Card>
     </div>

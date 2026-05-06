@@ -4,8 +4,18 @@ import {
   createSessionToken, getSessionCookie, getClearCookie,
   getCookieFromRequest, verifySessionToken,
   hashPassword, verifyPassword, isLegacyPasswordHash,
+  shouldRehash, rehashPassword,
 } from "@/lib/auth";
 
+// Password policy: min 8 chars, must include at least one non-digit (so users can't
+// pick "12345678"). Symbols/uppercase recommended but not enforced — usability tradeoff.
+function validatePasswordStrength(password: string): { ok: boolean; reason?: string } {
+  if (typeof password !== "string") return { ok: false, reason: "密码无效" };
+  if (password.length < 8) return { ok: false, reason: "密码至少 8 位" };
+  if (/^\d+$/.test(password)) return { ok: false, reason: "密码不能全为数字" };
+  if (password.length > 256) return { ok: false, reason: "密码过长" };
+  return { ok: true };
+}
 
 let tableEnsured = false;
 async function ensureTable(d1: D1Database) {
@@ -26,7 +36,7 @@ async function setValue(d1: D1Database, key: string, value: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const token = getCookieFromRequest(req as any);
+  const token = getCookieFromRequest(req as unknown as Request);
   const valid = token ? await verifySessionToken(token) : false;
   if (valid) return NextResponse.json({ authenticated: true });
 
@@ -36,7 +46,12 @@ export async function GET(req: NextRequest) {
     getValue(DB, "passkeyHash"),
     getValue(DB, "dataSource"),
   ]);
-  return NextResponse.json({ authenticated: false, needsSetup: !hash, hasPasskey: !!passkeyHash, dataSource: dataSource || "tencent" });
+  return NextResponse.json({
+    authenticated: false,
+    needsSetup: !hash,
+    hasPasskey: !!passkeyHash,
+    dataSource: dataSource || "tencent",
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -47,6 +62,9 @@ export async function POST(req: NextRequest) {
   if (body.action === "setup-password") {
     const existing = await getValue(DB, "passwordHash");
     if (existing) return NextResponse.json({ error: "Already set up" }, { status: 400 });
+
+    const check = validatePasswordStrength(body.password);
+    if (!check.ok) return NextResponse.json({ error: check.reason }, { status: 400 });
 
     const salt = crypto.getRandomValues(new Uint8Array(32));
     const { hash, salt: saltStr } = await hashPassword(body.password, salt);
@@ -68,12 +86,24 @@ export async function POST(req: NextRequest) {
     }
 
     if (isLegacyPasswordHash(storedSalt)) {
-      // Password was hashed with 250k PBKDF2 iterations — too slow for Workers edge runtime.
+      // 250k-iteration legacy — too slow on Workers, must reset.
       return NextResponse.json({ error: "密码已过期，请重置", needsReset: true }, { status: 401 });
     }
 
     const valid = await verifyPassword(body.password, storedSalt, storedHash);
     if (!valid) return NextResponse.json({ error: "密码错误" }, { status: 401 });
+
+    // Transparent upgrade: if the stored hash uses fewer iterations than the
+    // current default (e.g. the broken 1000 era), rehash with the new default.
+    if (shouldRehash(storedSalt)) {
+      try {
+        const { hash: newHash, salt: newSalt } = await rehashPassword(body.password);
+        await setValue(DB, "passwordHash", newHash);
+        await setValue(DB, "passwordSalt", newSalt);
+      } catch {
+        // Non-fatal: user is already logged in; upgrade can retry next login.
+      }
+    }
 
     const token = await createSessionToken();
     const res = NextResponse.json({ success: true });
@@ -81,21 +111,21 @@ export async function POST(req: NextRequest) {
     return res;
   }
 
-  // --- Force Reset (only when legacy hash is in place — no auth required) ---
+  // --- Force Reset (only when legacy 250k hash is in place) ---
   if (body.action === "reset-password") {
     const storedSalt = await getValue(DB, "passwordSalt");
-    // Only allow unauthenticated reset when existing password is the legacy format
     if (storedSalt && !isLegacyPasswordHash(storedSalt)) {
       return NextResponse.json({ error: "无需重置" }, { status: 400 });
     }
-    if (!body.password || body.password.length < 4) {
-      return NextResponse.json({ error: "密码至少4位" }, { status: 400 });
-    }
+
+    const check = validatePasswordStrength(body.password);
+    if (!check.ok) return NextResponse.json({ error: check.reason }, { status: 400 });
+
     const salt = crypto.getRandomValues(new Uint8Array(32));
     const { hash, salt: saltStr } = await hashPassword(body.password, salt);
     await setValue(DB, "passwordHash", hash);
     await setValue(DB, "passwordSalt", saltStr);
-    // Also clear passkey so it can be re-registered
+    // Clear passkey so it can be re-registered on the new credential
     await DB.prepare("DELETE FROM auth WHERE key = 'passkeyHash'").run();
 
     const token = await createSessionToken();
@@ -106,7 +136,7 @@ export async function POST(req: NextRequest) {
 
   // --- Passkey Register (requires active session) ---
   if (body.action === "passkey-register") {
-    const token = getCookieFromRequest(req as any);
+    const token = getCookieFromRequest(req as unknown as Request);
     if (!token || !(await verifySessionToken(token))) {
       return NextResponse.json({ error: "请先登录" }, { status: 401 });
     }
@@ -131,7 +161,7 @@ export async function POST(req: NextRequest) {
 
   // --- Save Settings (requires active session) ---
   if (body.action === "save-settings") {
-    const token = getCookieFromRequest(req as any);
+    const token = getCookieFromRequest(req as unknown as Request);
     if (!token || !(await verifySessionToken(token))) {
       return NextResponse.json({ error: "请先登录" }, { status: 401 });
     }
@@ -141,7 +171,7 @@ export async function POST(req: NextRequest) {
 
   // --- Delete Passkey (requires active session) ---
   if (body.action === "delete-passkey") {
-    const token = getCookieFromRequest(req as any);
+    const token = getCookieFromRequest(req as unknown as Request);
     if (!token || !(await verifySessionToken(token))) {
       return NextResponse.json({ error: "请先登录" }, { status: 401 });
     }

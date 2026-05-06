@@ -14,12 +14,24 @@ interface Account {
   currency: string;
 }
 
+interface EditTxnInput {
+  id: string;
+  accountId: string;
+  symbol: string;
+  market: string;
+  type: string;
+  quantity: number;
+  price: number;
+  fee: number;
+  date: string;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   accounts: Account[];
   onSave: (txn: { accountId: string; symbol: string; market: string; type: string; quantity: number; price: number; fee: number; date: string; id?: string }) => void;
-  editTxn?: { id: string; symbol: string; market: string; type: string; quantity: number; price: number; fee: number; date: string } | null;
+  editTxn?: EditTxnInput | null;
 }
 
 const typeOptions = [
@@ -34,6 +46,11 @@ const marketCurrency: Record<string, string> = {
   CH: "CHF", CA: "CAD", AU: "AUD", TW: "TWD", IN: "INR",
 };
 
+const todayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
 const defaultForm = {
   accountId: "",
   symbol: "",
@@ -42,7 +59,7 @@ const defaultForm = {
   quantity: "",
   price: "",
   fee: "",
-  date: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`,
+  date: todayStr(),
 };
 
 export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn }: Props) {
@@ -55,10 +72,11 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
   const [showSearch, setShowSearch] = useState(false);
   const lookupTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
+  // Populate form when editing
   useEffect(() => {
     if (open && editTxn) {
       setForm({
-        accountId: "",
+        accountId: editTxn.accountId || "",
         symbol: editTxn.symbol,
         market: editTxn.market,
         type: editTxn.type,
@@ -68,12 +86,16 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
         date: editTxn.date,
       });
       setSymbolName(editTxn.symbol);
+    } else if (open && !editTxn) {
+      // For new transactions, keep account/date stickiness across "save and continue"
+      setForm((f) => ({ ...defaultForm, accountId: f.accountId, date: f.date || todayStr() }));
+      setSymbolName("");
     }
   }, [open, editTxn]);
 
   interface SearchResult { symbol: string; fullSymbol: string; name: string; exchange: string; market: string; currency: string; marketLabel: string; price?: number | null }
 
-  const resetForm = () => {
+  const resetFormForContinue = () => {
     setForm({ ...defaultForm, accountId: form.accountId, date: form.date });
     setSymbolName("");
     setSearchResults([]);
@@ -100,13 +122,15 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
   }, []);
 
   const selectSearchResult = (item: SearchResult) => {
-    setForm({ ...form, symbol: item.symbol, market: item.market });
+    setForm((f) => ({
+      ...f,
+      symbol: item.symbol,
+      market: item.market,
+      ...(item.price && item.price > 0 ? { price: item.price.toString() } : {}),
+    }));
     setSymbolName(`${item.name} · ${item.marketLabel}`);
     setShowSearch(false);
     setSearchResults([]);
-    if (item.price && item.price > 0) {
-      setForm(f => ({ ...f, symbol: item.symbol, market: item.market, price: item.price!.toString() }));
-    }
   };
 
   const handleSymbolChange = (value: string) => {
@@ -138,14 +162,21 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
     });
     setSubmitting(false);
     setAddedCount(c => c + 1);
-    resetForm();
+    if (!editTxn) resetFormForContinue();
   };
 
   const qty = parseFloat(form.quantity);
   const prc = parseFloat(form.price);
-  const isValid = !!(form.accountId && form.symbol && !isNaN(qty) && qty > 0 && !isNaN(prc) && prc > 0);
+  const fee = parseFloat(form.fee || "0");
+  const isValid = !!(
+    form.accountId &&
+    form.symbol &&
+    !isNaN(qty) && qty > 0 &&
+    !isNaN(prc) && prc > 0 &&
+    (isNaN(fee) || fee >= 0)
+  );
   const estimatedTotal = form.quantity && form.price
-    ? (parseFloat(form.quantity) * parseFloat(form.price) + parseFloat(form.fee || "0")).toFixed(2)
+    ? (qty * prc + (isNaN(fee) ? 0 : fee)).toFixed(2)
     : "";
 
   const selectedType = typeOptions.find(t => t.value === form.type);
@@ -156,7 +187,7 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
   const showDualCurrency = accountCurrency && accountCurrency !== priceLabel;
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={(v) => v ? onOpenChange(true) : handleClose()}>
       <DialogContent className="bg-zinc-950 border-zinc-800 text-zinc-100 sm:max-w-lg max-h-[90vh] overflow-y-auto p-0">
         <div className="px-6 py-6">
           <DialogHeader className="mb-6">
@@ -194,7 +225,7 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
               </Select>
             </div>
 
-            {/* Symbol search — market auto-detected from search results */}
+            {/* Symbol search */}
             <div className="space-y-2">
               <Label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">代码或名称</Label>
               <div className="relative">
@@ -214,7 +245,6 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
                   <span className="text-zinc-600 ml-1">({form.market} · {marketCurrency[form.market] || "USD"})</span>
                 </p>
               )}
-              {/* Search results dropdown */}
               {showSearch && (
                 <div className="absolute z-50 mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl max-h-64 overflow-y-auto">
                   {searchResults.map((r, i) => (
@@ -273,6 +303,8 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
                   onChange={(e) => setForm({ ...form, quantity: e.target.value })}
                   className="bg-zinc-900 border-zinc-700 h-11 text-sm font-mono"
                   type="number"
+                  min="0"
+                  step="any"
                   placeholder="0"
                 />
               </div>
@@ -285,6 +317,8 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
                   onChange={(e) => setForm({ ...form, price: e.target.value })}
                   className="bg-zinc-900 border-zinc-700 h-11 text-sm font-mono"
                   type="number"
+                  min="0"
+                  step="any"
                   placeholder="0.00"
                 />
               </div>
@@ -299,6 +333,8 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
                   onChange={(e) => setForm({ ...form, fee: e.target.value })}
                   className="bg-zinc-900 border-zinc-700 h-11 text-sm font-mono"
                   type="number"
+                  min="0"
+                  step="any"
                   placeholder="0"
                 />
               </div>
@@ -316,7 +352,7 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
               </div>
             </div>
 
-            {/* Estimated Total */}
+            {/* Estimated total */}
             {estimatedTotal !== "" && (
               <div className="flex items-center justify-between px-4 py-3 rounded-lg bg-zinc-900/50 border border-zinc-800">
                 <span className="text-sm text-zinc-400">
@@ -334,11 +370,13 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
 
             {/* Buttons */}
             <div className="flex gap-2 pt-2">
-              <Button onClick={handleSaveAndContinue} disabled={!isValid || submitting} variant="outline" className="flex-1 h-11 text-sm border-zinc-700 text-zinc-300 hover:bg-zinc-800">
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "保存并继续"}
-              </Button>
+              {!editTxn && (
+                <Button onClick={handleSaveAndContinue} disabled={!isValid || submitting} variant="outline" className="flex-1 h-11 text-sm border-zinc-700 text-zinc-300 hover:bg-zinc-800">
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "保存并继续"}
+                </Button>
+              )}
               <Button onClick={async () => { await handleSaveAndContinue(); handleClose(); }} disabled={!isValid || submitting} className="flex-1 h-11 text-sm">
-                保存并关闭
+                {editTxn ? "保存修改" : "保存并关闭"}
               </Button>
             </div>
             {!isValid && (
@@ -348,6 +386,7 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
                   !form.symbol && "代码",
                   !form.quantity && "数量",
                   !form.price && "价格",
+                  !isNaN(fee) && fee < 0 && "手续费不能为负",
                 ].filter(Boolean).join("、")}
               </p>
             )}

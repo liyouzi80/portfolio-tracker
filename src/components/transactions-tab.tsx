@@ -12,7 +12,19 @@ import { ImportSheet } from "./import-sheet";
 import { Plus, Upload, Search, Trash2, Loader2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
-interface Txn { id: string; symbol: string; type: string; quantity: number; price: number; fee: number; date: string; market: string; currency: string; accountName: string }
+interface Txn {
+  id: string;
+  accountId: string;
+  symbol: string;
+  type: string;
+  quantity: number;
+  price: number;
+  fee: number;
+  date: string;
+  market: string;
+  currency: string;
+  accountName: string;
+}
 interface Account { id: string; name: string; currency: string }
 
 const typeLabels: Record<string, string> = { buy: "买入", sell: "卖出", dividend: "股息" };
@@ -38,12 +50,13 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
       const res = await fetch("/api/transactions");
       if (!res.ok) throw new Error("auth required");
       const data = await res.json() as Array<{
-        transactions: { id: string; type: string; quantity: number; price: number; fee: number; date: string };
+        transactions: { id: string; accountId: string; type: string; quantity: number; price: number; fee: number; date: string };
         assets: { symbol: string; market: string; currency: string } | null;
         accounts: { name: string } | null;
       }>;
       const mapped: Txn[] = data.map((row) => ({
         id: row.transactions.id,
+        accountId: row.transactions.accountId,
         symbol: row.assets?.symbol ?? "?",
         type: row.transactions.type,
         quantity: row.transactions.quantity,
@@ -75,7 +88,7 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
   const handleEdit = (t: Txn) => {
     setEditTxn({
       id: t.id,
-      accountId: "",
+      accountId: t.accountId,
       symbol: t.symbol,
       market: t.market,
       type: t.type,
@@ -98,7 +111,8 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
     const prevTxns = txns;
     setTxns((p) => p.filter((t) => t.id !== id));
     try {
-      await fetch(`/api/transactions?id=${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/transactions?id=${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("delete failed");
       toast.success("交易记录已删除");
     } catch {
       setTxns(prevTxns);
@@ -116,11 +130,18 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
   const handleSaveTxn = async (t: { id?: string; accountId: string; symbol: string; market: string; type: string; quantity: number; price: number; fee: number; date: string }) => {
     try {
       if (t.id) {
-        // Edit existing transaction
+        // Edit existing — include accountId so user can move txn between accounts
         const res = await fetch(`/api/transactions/${t.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: t.type, quantity: t.quantity, price: t.price, fee: t.fee, date: t.date }),
+          body: JSON.stringify({
+            accountId: t.accountId,
+            type: t.type,
+            quantity: t.quantity,
+            price: t.price,
+            fee: t.fee,
+            date: t.date,
+          }),
         });
         const data = await res.json() as { success?: boolean; error?: string };
         if (data.success) { loadTxns(); toast.success("交易已更新"); }
@@ -146,7 +167,6 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
       });
       const data = await res.json() as { id?: string; error?: string };
       if (data.id) {
-        // Don't reload here — let batch saves accumulate
         toast.success("交易已保存");
       } else {
         toast.error(data.error || "保存失败");
@@ -238,11 +258,11 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
                       {typeLabels[t.type] ?? t.type}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right font-mono">{t.quantity}</TableCell>
+                  <TableCell className="text-right font-mono">{t.quantity.toLocaleString()}</TableCell>
                   <TableCell className="text-right font-mono">{t.currency} {t.price.toFixed(2)}</TableCell>
                   <TableCell className="text-right font-mono text-zinc-500">{t.currency} {t.fee.toFixed(2)}</TableCell>
                   <TableCell className="text-right font-mono">
-                    {t.currency} {(t.quantity * t.price + t.fee).toLocaleString()}
+                    {t.currency} {(t.quantity * t.price + (t.type === "sell" ? -t.fee : t.fee)).toLocaleString()}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-0.5">
