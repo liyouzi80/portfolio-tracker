@@ -16,6 +16,7 @@ interface Txn {
   id: string;
   accountId: string;
   symbol: string;
+  name: string;
   type: string;
   quantity: number;
   price: number;
@@ -51,13 +52,14 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
       if (!res.ok) throw new Error("auth required");
       const data = await res.json() as Array<{
         transactions: { id: string; accountId: string; type: string; quantity: number; price: number; fee: number; date: string };
-        assets: { symbol: string; market: string; currency: string } | null;
+        assets: { symbol: string; name?: string; market: string; currency: string } | null;
         accounts: { name: string } | null;
       }>;
       const mapped: Txn[] = data.map((row) => ({
         id: row.transactions.id,
         accountId: row.transactions.accountId,
         symbol: row.assets?.symbol ?? "?",
+        name: row.assets?.name && row.assets.name !== row.assets.symbol ? row.assets.name : "",
         type: row.transactions.type,
         quantity: row.transactions.quantity,
         price: row.transactions.price,
@@ -241,6 +243,7 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
                 <TableHead className="text-zinc-500">日期</TableHead>
                 <TableHead className="text-zinc-500">账户</TableHead>
                 <TableHead className="text-zinc-500">代码</TableHead>
+                <TableHead className="text-zinc-500">名称</TableHead>
                 <TableHead className="text-zinc-500">类型</TableHead>
                 <TableHead className="text-zinc-500 text-right">数量</TableHead>
                 <TableHead className="text-zinc-500 text-right">价格</TableHead>
@@ -255,6 +258,7 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
                   <TableCell className="text-zinc-300">{t.date}</TableCell>
                   <TableCell className="text-zinc-400 text-sm">{t.accountName}</TableCell>
                   <TableCell className="font-mono font-medium">{t.symbol}</TableCell>
+                  <TableCell className="text-zinc-400 text-sm max-w-[120px] truncate">{t.name || t.symbol}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className={typeColors[t.type] ?? "border-zinc-700"}>
                       {typeLabels[t.type] ?? t.type}
