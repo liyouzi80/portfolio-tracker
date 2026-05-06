@@ -56,7 +56,7 @@ export function SettingsTab() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [alertOpen, setAlertOpen] = useState(false);
   const [editAccount, setEditAccount] = useState<Account | null>(null);
-  const [dataSource, setDataSource] = useState("yahoo");
+  const [dataSource, setDataSource] = useState("tencent");
   const [testing, setTesting] = useState(false);
   const [registeringPasskey, setRegisteringPasskey] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -111,7 +111,7 @@ export function SettingsTab() {
           setAccounts(accounts.map(a => a.id === acc.id ? { ...a, name: acc.name, currency: acc.currency, leverage: acc.leverage } : a));
           toast.success("账户已更新");
         } else { toast.error(data.error || "更新失败"); }
-      } catch { toast.error("网络错误"); }
+      } catch { toast.error("操作失败，请重试"); }
     } else {
       // Create new
       try {
@@ -125,13 +125,23 @@ export function SettingsTab() {
           setAccounts([...accounts, { id: data.id, name: acc.name, currency: acc.currency, leverage: acc.leverage }]);
           toast.success("账户已添加");
         } else { toast.error(data.error || "添加失败"); }
-      } catch { toast.error("网络错误"); }
+      } catch { toast.error("操作失败，请重试"); }
     }
     setEditAccount(null);
   };
 
   const handleDeleteAccount = async (id: string) => {
-    if (!confirm("确认删除此账户？关联的交易记录将无法显示。")) return;
+    let msg = "确认删除此账户？";
+    try {
+      const txnRes = await fetch(`/api/transactions?accountId=${id}`);
+      if (txnRes.ok) {
+        const txns = await txnRes.json() as unknown[];
+        if (txns.length > 0) {
+          msg = `该账户下有 ${txns.length} 条交易记录，删除账户将连带删除所有交易，确认继续？`;
+        }
+      }
+    } catch { /* fallback */ }
+    if (!confirm(msg)) return;
     const prev = accounts;
     setAccounts(accounts.filter((a) => a.id !== id));
     try {
@@ -139,7 +149,7 @@ export function SettingsTab() {
       const data = await res.json() as { success?: boolean; error?: string };
       if (data.success) { toast.success("账户已删除"); }
       else { setAccounts(prev); toast.error(data.error || "删除失败"); }
-    } catch { setAccounts(prev); toast.error("网络错误"); }
+    } catch { setAccounts(prev); toast.error("操作失败，请重试"); }
   };
 
   const handleAddAlert = async (a: { symbol: string; condition: string; threshold: number }) => {
@@ -157,7 +167,7 @@ export function SettingsTab() {
       } else {
         toast.error(data.error || "创建失败");
       }
-    } catch { toast.error("网络错误"); }
+    } catch { toast.error("操作失败，请重试"); }
   };
 
   const handleDeleteAlert = async (id: string) => {
@@ -165,7 +175,7 @@ export function SettingsTab() {
       await fetch(`/api/alerts?id=${id}`, { method: "DELETE" });
       setAlerts(alerts.filter((a) => a.id !== id));
       toast.success("提醒已删除");
-    } catch { toast.error("网络错误"); }
+    } catch { toast.error("操作失败，请重试"); }
   };
 
   const handleToggleAlert = async (id: string) => {

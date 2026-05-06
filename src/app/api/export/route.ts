@@ -14,12 +14,13 @@ export async function GET(_req: NextRequest) {
   const { DB: d1 } = getPlatformEnv();
 
   try {
-    const [txns, accts, assetsList, snaps, rates] = await Promise.all([
+    const [txns, accts, assetsList, snaps, rates, alertsList] = await Promise.all([
       d1.prepare("SELECT t.*, a.symbol, a.name as asset_name, a.market, a.currency as asset_currency, ac.name as account_name FROM transactions t LEFT JOIN assets a ON t.asset_id = a.id LEFT JOIN accounts ac ON t.account_id = ac.id ORDER BY t.date DESC").all(),
       d1.prepare("SELECT * FROM accounts").all(),
       d1.prepare("SELECT * FROM assets").all(),
       d1.prepare("SELECT * FROM daily_snapshots ORDER BY date DESC").all(),
       d1.prepare("SELECT * FROM exchange_rates").all(),
+      d1.prepare("SELECT a.*, ass.symbol, ass.market FROM alerts a LEFT JOIN assets ass ON a.asset_id = ass.id").all(),
     ]);
 
     const lines: string[] = [];
@@ -61,6 +62,14 @@ export async function GET(_req: NextRequest) {
     lines.push("from_currency,to_currency,rate,updated_at");
     for (const r of (rates.results as any[])) {
       lines.push([r.from_currency, r.to_currency, r.rate, r.updated_at].map(escapeCSV).join(","));
+    }
+
+    // ── Section 6: Alerts ──
+    lines.push("");
+    lines.push("# Alerts");
+    lines.push("id,symbol,market,condition_type,threshold,enabled,triggered_at");
+    for (const r of (alertsList.results as any[])) {
+      lines.push([r.id, r.symbol, r.market, r.condition_type, r.threshold, r.enabled, r.triggered_at].map(escapeCSV).join(","));
     }
 
     const csv = lines.join("\n");

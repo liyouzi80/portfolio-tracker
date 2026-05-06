@@ -104,9 +104,12 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
 
   const handleClose = () => {
     setAddedCount(0);
-    setForm(defaultForm);
-    setSymbolName("");
     onOpenChange(false);
+    // Defer form reset until close animation completes (~200ms)
+    setTimeout(() => {
+      setForm(defaultForm);
+      setSymbolName("");
+    }, 200);
   };
 
   const searchSymbols = useCallback(async (query: string) => {

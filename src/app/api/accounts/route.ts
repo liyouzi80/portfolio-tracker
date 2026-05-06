@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db";
-import { accounts, transactions } from "@/db/schema";
+import { accounts, transactions, dailySnapshots } from "@/db/schema";
 import { cuid } from "@/lib/cuid";
 import { getPlatformEnv } from "@/lib/env";
 import { eq } from "drizzle-orm";
@@ -32,12 +32,9 @@ export async function DELETE(req: NextRequest) {
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
-  // Check for linked transactions
-  const linkedCount = await db.select().from(transactions).where(eq(transactions.accountId, id)).all();
-  if (linkedCount.length > 0) {
-    return NextResponse.json({ error: `该账户有 ${linkedCount.length} 条关联交易记录，请先删除交易记录` }, { status: 400 });
-  }
-
+  // Cascade delete: transactions and snapshots first, then account
+  await db.delete(transactions).where(eq(transactions.accountId, id));
+  await db.delete(dailySnapshots).where(eq(dailySnapshots.accountId, id));
   await db.delete(accounts).where(eq(accounts.id, id));
   return NextResponse.json({ success: true });
 }

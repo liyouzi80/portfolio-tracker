@@ -177,7 +177,7 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
         toast.error(data.error || "保存失败");
       }
     } catch {
-      toast.error("网络错误");
+      toast.error("操作失败，请重试");
     }
   };
 
@@ -186,7 +186,12 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
   };
 
   const filtered = txns.filter((t) => {
-    if (search && !t.symbol.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      const symbolMatch = t.symbol.toLowerCase().includes(q);
+      const nameMatch = t.name?.toLowerCase().includes(q) ?? false;
+      if (!symbolMatch && !nameMatch) return false;
+    }
     if (typeFilter !== "all" && t.type !== typeFilter) return false;
     return true;
   });
