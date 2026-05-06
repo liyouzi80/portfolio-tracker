@@ -11,6 +11,18 @@ function tencentSymbol(symbol: string, market: string): string {
   return symbol.toLowerCase(); // US
 }
 
+// Decode Tencent's GBK response to UTF-8
+async function decodeGbk(buf: ArrayBuffer): Promise<string> {
+  try {
+    return new TextDecoder("gbk").decode(buf);
+  } catch {
+    // Fallback: try gb18030, then latin1+fromCharCode
+    try { return new TextDecoder("gb18030").decode(buf); } catch { /* last resort */ }
+    const bytes = new Uint8Array(buf);
+    return String.fromCharCode(...bytes);
+  }
+}
+
 export async function fetchTencentPrice(symbol: string, market: string): Promise<{ price: number; name: string; prevClose?: number } | null> {
   const qs = tencentSymbol(symbol, market);
   try {
@@ -18,7 +30,8 @@ export async function fetchTencentPrice(symbol: string, market: string): Promise
       headers: { "User-Agent": "Mozilla/5.0" },
     });
     if (!res.ok) return null;
-    const text = await res.text();
+    const buf = await res.arrayBuffer();
+    const text = await decodeGbk(buf);
     // Response: v_sh600519="1~贵州茅台~600519~1850.00~..."
     const match = text.match(/"([^"]*)"/);
     if (!match) return null;
@@ -47,7 +60,8 @@ export async function fetchTencentPrices(
       headers: { "User-Agent": "Mozilla/5.0" },
     });
     if (!res.ok) return result;
-    const text = await res.text();
+    const buf = await res.arrayBuffer();
+    const text = await decodeGbk(buf);
     const matches = text.matchAll(/v_(\w+)="([^"]*)"/g);
     for (const m of matches) {
       const fields = m[2].split("~");

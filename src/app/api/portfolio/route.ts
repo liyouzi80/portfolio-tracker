@@ -199,6 +199,13 @@ export async function GET(req: NextRequest) {
           h.todayPnl = Math.round((cp - pc) * h.quantity * 100) / 100;
           h.todayPnlInBase = Math.round((cp - pc) * h.quantity * rate * 100) / 100;
         }
+      } else {
+        // No real-time price: use avgCost so P&L = 0, market value matches cost
+        h.currentPrice = h.avgCost;
+        h.pnl = 0;
+        h.pnlPct = 0;
+        h.pnlInBase = 0;
+        h.marketValueInBase = Math.round(h.avgCost * h.quantity * rate * 100) / 100;
       }
     }
 
