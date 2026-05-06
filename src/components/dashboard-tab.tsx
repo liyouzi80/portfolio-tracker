@@ -14,6 +14,7 @@ interface Holding {
   quantity: number; totalCost: number; totalFee: number; avgCost: number;
   currentPrice?: number; prevClose?: number; pnl?: number; pnlPct?: number;
   todayPnl?: number; pnlInBase?: number; todayPnlInBase?: number; marketValueInBase?: number;
+  priceUpdatedAt?: number;
 }
 interface ChartPoint { date: string; value: number; }
 interface AccountSummary {
@@ -77,6 +78,61 @@ function MetricCard({
       </div>
       {/* Subtle corner shimmer */}
       <div className="absolute -top-10 -right-10 w-20 h-20 bg-white/[0.01] rounded-full blur-xl group-hover:bg-white/[0.03] transition-colors duration-700" />
+    </div>
+  );
+}
+
+// ── Market Data Status ────────────────────────────────────
+function MarketDataStatus({ holdings }: { holdings: Holding[] }) {
+  if (holdings.length === 0) return null;
+
+  const total = holdings.length;
+  const fresh = holdings.filter(h => h.currentPrice !== undefined && h.currentPrice > 0).length;
+
+  const validTimestamps = holdings
+    .map(h => h.priceUpdatedAt)
+    .filter((t): t is number => typeof t === "number" && t > 0);
+  const latestUpdate = validTimestamps.length > 0 ? Math.max(...validTimestamps) : null;
+
+  if (latestUpdate === null) {
+    return (
+      <div className="text-xs text-zinc-500 px-1">
+        行情更新：暂无数据
+      </div>
+    );
+  }
+
+  const timeStr = new Date(latestUpdate).toLocaleString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+  const minutesAgo = Math.floor((Date.now() - latestUpdate) / 60000);
+  const timeColor =
+    minutesAgo > 240 ? "text-red-400" :
+    minutesAgo > 60 ? "text-amber-400" :
+    "text-zinc-300";
+
+  const missingSymbols = holdings
+    .filter(h => h.currentPrice === undefined || h.currentPrice <= 0)
+    .map(h => h.symbol);
+  const missingTitle = missingSymbols.length > 0
+    ? `未拿到价格：${missingSymbols.join("、")}`
+    : undefined;
+
+  return (
+    <div className="text-xs text-zinc-500 px-1 flex items-center gap-1.5 flex-wrap">
+      <span>行情更新：</span>
+      <span className={`font-mono tabular-nums ${timeColor}`}>{timeStr}</span>
+      <span className="text-zinc-600">·</span>
+      <span>已更新</span>
+      <span
+        className={`font-mono tabular-nums ${fresh < total ? "text-amber-400 cursor-help" : "text-zinc-300"}`}
+        title={missingTitle}
+      >
+        {fresh}/{total}
+      </span>
     </div>
   );
 }
@@ -151,6 +207,9 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
 
   return (
     <div className="space-y-4">
+      {/* Market data status */}
+      <MarketDataStatus holdings={data.holdings} />
+
       {/* ── KPI Row ─────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <MetricCard label="总市值" icon={Wallet}

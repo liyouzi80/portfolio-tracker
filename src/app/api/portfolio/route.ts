@@ -22,6 +22,7 @@ interface Holding {
   pnlInBase?: number;      // unrealized P&L converted to baseCurrency
   todayPnlInBase?: number; // today's P&L converted to baseCurrency
   marketValueInBase?: number;
+  priceUpdatedAt?: number;  // unix ms, max of KV updatedAt across all holdings
 }
 
 interface AccountSummary {
@@ -89,7 +90,7 @@ export async function GET(req: NextRequest) {
   };
 
   const { PRICE_CACHE } = getPlatformEnv();
-  const priceCache = new Map<string, { price: number; prevClose?: number }>();
+  const priceCache = new Map<string, { price: number; prevClose?: number; updatedAt?: number }>();
 
   const accountSummaries: AccountSummary[] = [];
 
@@ -175,7 +176,7 @@ export async function GET(req: NextRequest) {
       holdings.map(async (h) => {
         const cacheKey = `price:${h.market}:${h.symbol}`;
         try {
-          const cached = await PRICE_CACHE.get(cacheKey, "json") as { price?: number; prevClose?: number } | null;
+          const cached = await PRICE_CACHE.get(cacheKey, "json") as { price?: number; prevClose?: number; updatedAt?: number } | null;
           if (cached?.price) return { holding: h, cached };
         } catch { /* ignore */ }
         return { holding: h, cached: null };
@@ -185,7 +186,7 @@ export async function GET(req: NextRequest) {
     const missingPrices: Array<{ symbol: string; market: string }> = [];
     for (const { holding, cached } of cacheLookups) {
       if (cached?.price) {
-        priceCache.set(holding.symbol + holding.market, { price: cached.price, prevClose: cached.prevClose });
+        priceCache.set(holding.symbol + holding.market, { price: cached.price, prevClose: cached.prevClose, updatedAt: cached.updatedAt as number | undefined });
       } else {
         missingPrices.push({ symbol: holding.symbol, market: holding.market });
       }
@@ -205,14 +206,14 @@ export async function GET(req: NextRequest) {
       // HK: Longbridge primary, Tencent fallback
       const lbPrices = hkSymbols.length > 0 ? await fetchLongbridgePrices(hkSymbols) : new Map();
       for (const [k, v] of lbPrices) {
-        priceCache.set(k.split(":")[1] + k.split(":")[0], { price: v.price, prevClose: v.prevClose });
+        priceCache.set(k.split(":")[1] + k.split(":")[0], { price: v.price, prevClose: v.prevClose, updatedAt: Date.now() });
         const [market, symbol] = k.split(":");
         PRICE_CACHE.put(`price:${market}:${symbol}`, JSON.stringify({ symbol, market, price: v.price, prevClose: v.prevClose, name: v.name || symbol, updatedAt: Date.now() }), { expirationTtl: 86400 }).catch(() => {});
       }
       const hkMissedByLB = hkSymbols.filter(s => !lbPrices.has(`${s.market}:${s.symbol}`));
       const tencentHK = hkMissedByLB.length > 0 ? await fetchTencentPrices(hkMissedByLB) : new Map();
       for (const [k, v] of tencentHK) {
-        priceCache.set(k.split(":")[1] + k.split(":")[0], { price: v.price, prevClose: v.prevClose });
+        priceCache.set(k.split(":")[1] + k.split(":")[0], { price: v.price, prevClose: v.prevClose, updatedAt: Date.now() });
         const [market, symbol] = k.split(":");
         PRICE_CACHE.put(`price:${market}:${symbol}`, JSON.stringify({ symbol, market, price: v.price, prevClose: v.prevClose, name: v.name || symbol, updatedAt: Date.now() }), { expirationTtl: 86400 }).catch(() => {});
       }
@@ -221,7 +222,7 @@ export async function GET(req: NextRequest) {
       if (cnSymbols.length > 0) {
         const tencentCN = await fetchTencentPrices(cnSymbols);
         for (const [k, v] of tencentCN) {
-          priceCache.set(k.split(":")[1] + k.split(":")[0], { price: v.price, prevClose: v.prevClose });
+          priceCache.set(k.split(":")[1] + k.split(":")[0], { price: v.price, prevClose: v.prevClose, updatedAt: Date.now() });
           const [market, symbol] = k.split(":");
           PRICE_CACHE.put(`price:${market}:${symbol}`, JSON.stringify({ symbol, market, price: v.price, prevClose: v.prevClose, name: v.name || symbol, updatedAt: Date.now() }), { expirationTtl: 86400 }).catch(() => {});
         }
@@ -235,7 +236,7 @@ export async function GET(req: NextRequest) {
         }));
         for (const { s, price, prevClose, name } of fhResults) {
           if (price) {
-            priceCache.set(s.symbol + s.market, { price, prevClose });
+            priceCache.set(s.symbol + s.market, { price, prevClose, updatedAt: Date.now() });
             PRICE_CACHE.put(`price:${s.market}:${s.symbol}`, JSON.stringify({ symbol: s.symbol, market: s.market, price, prevClose, name: name || s.symbol, updatedAt: Date.now() }), { expirationTtl: 86400 }).catch(() => {});
           }
         }
@@ -249,7 +250,7 @@ export async function GET(req: NextRequest) {
         }));
         for (const { s, price, prevClose, name } of yahooResults) {
           if (price) {
-            priceCache.set(s.symbol + s.market, { price, prevClose });
+            priceCache.set(s.symbol + s.market, { price, prevClose, updatedAt: Date.now() });
             PRICE_CACHE.put(`price:${s.market}:${s.symbol}`, JSON.stringify({ symbol: s.symbol, market: s.market, price, prevClose, name: name || s.symbol, updatedAt: Date.now() }), { expirationTtl: 86400 }).catch(() => {});
           }
         }
@@ -280,6 +281,7 @@ export async function GET(req: NextRequest) {
       const rateMissing = rate === 0 && h.currency !== baseCurrency;
       if (cp && cp > 0 && !rateMissing) {
         h.currentPrice = cp;
+        h.priceUpdatedAt = cached?.updatedAt;
         h.pnl = Math.round((cp - h.avgCost) * h.quantity * 100) / 100;
         h.pnlPct = h.avgCost > 0 ? Math.round((cp - h.avgCost) / h.avgCost * 10000) / 100 : 0;
         h.pnlInBase = Math.round((cp - h.avgCost) * h.quantity * rate * 100) / 100;
