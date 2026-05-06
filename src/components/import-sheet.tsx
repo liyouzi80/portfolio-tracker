@@ -25,6 +25,7 @@ export function ImportSheet({ open, onOpenChange, accounts, onDone }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [accountId, setAccountId] = useState("");
   const [importing, setImporting] = useState(false);
+  const [purgeFirst, setPurgeFirst] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -46,6 +47,7 @@ export function ImportSheet({ open, onOpenChange, accounts, onDone }: Props) {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("accountId", accountId);
+      if (purgeFirst) formData.append("purge", "1");
       const res = await fetch("/api/transactions/import", { method: "POST", body: formData });
       const data = await res.json() as { count?: number; error?: string };
       if (data.count !== undefined) {
@@ -131,8 +133,22 @@ export function ImportSheet({ open, onOpenChange, accounts, onDone }: Props) {
             </a>
           </div>
 
-          <Button onClick={handleImport} disabled={!file || !accountId || importing} className="w-full">
-            {importing ? "导入中..." : "开始导入"}
+          {/* Purge mode checkbox */}
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="purge-mode"
+              checked={purgeFirst}
+              onChange={(e) => setPurgeFirst(e.target.checked)}
+              className="rounded accent-red-500"
+            />
+            <label htmlFor="purge-mode" className="text-xs text-zinc-400 cursor-pointer">
+              清空目标账户已有交易后导入（用于完整数据替换）
+            </label>
+          </div>
+
+          <Button onClick={handleImport} disabled={!file || !accountId || importing} className={`w-full ${purgeFirst ? "bg-red-600 hover:bg-red-700" : ""}`}>
+            {importing ? "导入中..." : purgeFirst ? "清空并导入" : "开始导入"}
           </Button>
         </div>
       </SheetContent>

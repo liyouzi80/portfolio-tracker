@@ -28,10 +28,13 @@ interface AccountSummary {
   id: string;
   name: string;
   currency: string;
+  leverage?: number;
   totalCost: number;
   totalMarketValue?: number;
   totalPnl?: number;
   realizedPnl?: number;
+  tradingPnl?: number;
+  dividendIncome?: number;
   unrealizedPnl?: number;
   holdings: Holding[];
 }
@@ -99,6 +102,8 @@ export async function GET(req: NextRequest) {
 
     const holdingsMap = new Map<string, Holding>();
     let realizedPnl = 0;
+    let tradingPnl = 0;
+    let dividendIncome = 0;
 
     for (const row of txns) {
       const txn = row.transactions;
@@ -107,9 +112,9 @@ export async function GET(req: NextRequest) {
 
       // Dividend: realized cash inflow, no quantity impact
       if (txn.type === "dividend") {
-        // dividend amount is stored as quantity*price in original currency, convert to account currency
         const divInAccCcy = (txn.quantity * txn.price) * getRate(asset.currency, acc.currency);
         realizedPnl += divInAccCcy;
+        dividendIncome += divInAccCcy;
         continue;
       }
 
@@ -135,7 +140,9 @@ export async function GET(req: NextRequest) {
         const sellValue = txn.quantity * txn.price - (txn.fee ?? 0);
         const costBasis = txn.quantity * avgCost;
         // realizedPnl = (qty × (price - avgCost) - fee) × rate  ← sell fee is deducted from proceeds
-        realizedPnl += (sellValue - costBasis) * getRate(asset.currency, acc.currency);
+        const pnl = (sellValue - costBasis) * getRate(asset.currency, acc.currency);
+        realizedPnl += pnl;
+        tradingPnl += pnl;
         existing.quantity -= txn.quantity;
         existing.totalCost -= txn.quantity * avgCost;
         existing.totalFee += txn.fee ?? 0; // track sell fees for reporting
@@ -153,7 +160,9 @@ export async function GET(req: NextRequest) {
         // Position fully closed. Carry any residual cost to realized P&L
         // to prevent orphaned micro-amounts from accumulating in the database.
         if (Math.abs(existing.totalCost) > 0.001) {
-          realizedPnl -= existing.totalCost * getRate(asset.currency, acc.currency);
+          const residual = existing.totalCost * getRate(asset.currency, acc.currency);
+          realizedPnl -= residual;
+          tradingPnl -= residual;
         }
         holdingsMap.delete(key);
       }
@@ -298,10 +307,13 @@ export async function GET(req: NextRequest) {
       id: acc.id,
       name: acc.name,
       currency: acc.currency,
-      totalCost: Math.round(accountTotalCost * 100) / 100,         // full cost (all holdings)
-      totalMarketValue: Math.round(accountMarketValue * 100) / 100, // priced only
+      leverage: acc.leverage ?? 1,
+      totalCost: Math.round(accountTotalCost * 100) / 100,
+      totalMarketValue: Math.round(accountMarketValue * 100) / 100,
       totalPnl: Math.round(totalPnl * 100) / 100,
       realizedPnl: Math.round(realizedPnl * 100) / 100,
+      tradingPnl: Math.round(tradingPnl * 100) / 100,
+      dividendIncome: Math.round(dividendIncome * 100) / 100,
       unrealizedPnl: Math.round(unrealizedPnl * 100) / 100,
       holdings,
     });
@@ -325,6 +337,14 @@ export async function GET(req: NextRequest) {
   const portfolioRealizedPnl = accountSummaries.reduce((s, a) => {
     const r = getRate(a.currency, baseCurrency);
     return r === 0 && a.currency !== baseCurrency ? s : s + (a.realizedPnl ?? 0) * r;
+  }, 0);
+  const portfolioTradingPnl = accountSummaries.reduce((s, a) => {
+    const r = getRate(a.currency, baseCurrency);
+    return r === 0 && a.currency !== baseCurrency ? s : s + (a.tradingPnl ?? 0) * r;
+  }, 0);
+  const portfolioDividendIncome = accountSummaries.reduce((s, a) => {
+    const r = getRate(a.currency, baseCurrency);
+    return r === 0 && a.currency !== baseCurrency ? s : s + (a.dividendIncome ?? 0) * r;
   }, 0);
   const portfolioUnrealizedPnl = accountSummaries.reduce((s, a) => {
     const r = getRate(a.currency, baseCurrency);
@@ -430,6 +450,8 @@ export async function GET(req: NextRequest) {
     totalPnl: Math.round(portfolioTotalPnl * 100) / 100,
     todayPnl: Math.round(portfolioTodayPnl * 100) / 100,
     realizedPnl: Math.round(portfolioRealizedPnl * 100) / 100,
+    tradingPnl: Math.round(portfolioTradingPnl * 100) / 100,
+    dividendIncome: Math.round(portfolioDividendIncome * 100) / 100,
     unrealizedPnl: Math.round(portfolioUnrealizedPnl * 100) / 100,
     accounts: accountSummaries,
     holdings: accountSummaries.flatMap(a => a.holdings),

@@ -65,6 +65,7 @@ export function HoldingsTable({ data, onSymbolClick }: { data: Holding[]; onSymb
           <TableHead className="text-zinc-500">市场</TableHead>
           <TableHead className="text-zinc-500 text-right">数量</TableHead>
           <TableHead className="text-zinc-500 text-right">均价</TableHead>
+          <TableHead className="text-zinc-500 text-right">现价</TableHead>
           <TableHead className="text-zinc-500 text-right">成本</TableHead>
           <TableHead className="text-zinc-500 text-right">盈亏</TableHead>
           <TableHead className="text-zinc-500 w-8" />
@@ -89,6 +90,15 @@ export function HoldingsTable({ data, onSymbolClick }: { data: Holding[]; onSymb
             <TableCell className="text-right font-mono tabular-nums">{fmtQuantity(h.quantity)}</TableCell>
             <TableCell className="text-right font-mono tabular-nums">
               {h.currency} {fmtMoney(h.avgCost)}
+            </TableCell>
+            <TableCell className="text-right font-mono tabular-nums">
+              {h.currentPrice !== undefined ? (
+                <span className={h.currentPrice >= h.avgCost ? "text-emerald-400" : "text-red-400"}>
+                  {h.currency} {fmtMoney(h.currentPrice)}
+                </span>
+              ) : (
+                <span className="text-zinc-500">--</span>
+              )}
             </TableCell>
             <TableCell className="text-right font-mono tabular-nums">
               {h.currency} {fmtMoney(h.totalCost)}

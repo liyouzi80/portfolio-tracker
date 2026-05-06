@@ -17,12 +17,12 @@ interface Holding {
 }
 interface ChartPoint { date: string; value: number; }
 interface AccountSummary {
-  id: string; name: string; currency: string; totalCost: number;
-  totalMarketValue?: number; totalPnl?: number; realizedPnl?: number; unrealizedPnl?: number; holdings: Holding[];
+  id: string; name: string; currency: string; leverage?: number; totalCost: number;
+  totalMarketValue?: number; totalPnl?: number; realizedPnl?: number; tradingPnl?: number; dividendIncome?: number; unrealizedPnl?: number; holdings: Holding[];
 }
 interface PortfolioData {
   baseCurrency: string; totalValue: number; totalMarketValue?: number; totalPnl?: number;
-  todayPnl?: number; realizedPnl?: number; unrealizedPnl?: number;
+  todayPnl?: number; realizedPnl?: number; tradingPnl?: number; dividendIncome?: number; unrealizedPnl?: number;
   accounts: AccountSummary[]; holdings: Holding[];
   costSeries?: ChartPoint[]; valueSeries?: ChartPoint[]; pnlSeries?: ChartPoint[];
   chartData?: ChartPoint[]; rates: Record<string, number>;
@@ -121,6 +121,8 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
   const totalPnl = data.totalPnl ?? 0;
   const todayPnl = data.todayPnl ?? 0;
   const realizedPnl = data.realizedPnl ?? 0;
+  const tradingPnl = data.tradingPnl ?? 0;
+  const dividendIncome = data.dividendIncome ?? 0;
   const unrealizedPnl = data.unrealizedPnl ?? 0;
   const holdingsCount = data.holdings.length;
   const markets = new Set(data.holdings.map((h) => h.market));
@@ -163,7 +165,7 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
           sentiment="neutral" delay={4} />
         <MetricCard label="已实现盈亏"
           value={realizedPnl !== 0 ? fmtMoney(realizedPnl, cs) : "--"}
-          sub={`浮动 ${fmtMoney(unrealizedPnl, cs)}`}
+          sub={`交易 ${fmtMoney(tradingPnl, cs)} · 股息 ${fmtMoney(dividendIncome, cs)}`}
           sentiment={realizedPnl > 0 ? "up" : realizedPnl < 0 ? "down" : "neutral"} delay={5} />
       </div>
 
@@ -189,6 +191,14 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
                 <div className={`text-[11px] font-mono mt-1 ${pnlSentiment}`}>
                   {fmtMoney(pnl, currencySymbols[a.currency] ?? "")}
                 </div>
+                {a.totalCost > 0 && (
+                  <div className={`text-[10px] font-mono mt-0.5 ${
+                    a.leverage && ((a.totalMarketValue ?? a.totalCost) / a.totalCost) > a.leverage ? "text-red-400" : "text-zinc-600"
+                  }`}>
+                    市值倍率 {((a.totalMarketValue ?? a.totalCost) / a.totalCost).toFixed(2)}x
+                    {a.leverage && a.leverage > 1 ? ` / 上限 ${a.leverage}x` : ""}
+                  </div>
+                )}
                 <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-white/[0.005] rounded-full blur-md group-hover:bg-white/[0.02] transition-colors duration-500" />
               </div>
             );

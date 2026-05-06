@@ -72,8 +72,22 @@ export async function POST(req: NextRequest) {
   const accountId = formData.get("accountId") as string;
   if (!accountId) return NextResponse.json({ error: "请选择导入账户" }, { status: 400 });
 
-  // Validate the account actually exists and belongs to the (single-user) database.
+  // Validate the account actually exists
   const acctRow = await db.select().from(accounts).where(eq(accounts.id, accountId)).all();
+  if (acctRow.length === 0) {
+    return NextResponse.json({ error: "账户不存在" }, { status: 400 });
+  }
+
+  // Purge mode: delete all transactions for this account before import
+  const purge = formData.get("purge") === "1";
+  if (purge) {
+    await db.delete(transactions).where(eq(transactions.accountId, accountId));
+    // Also clear tx_hash column constraint if needed
+    if (!migrationsRun) {
+      try { await getPlatformEnv().DB.prepare("ALTER TABLE transactions ADD COLUMN tx_hash TEXT").run(); } catch { /* exists */ }
+      migrationsRun = true;
+    }
+  }
   if (acctRow.length === 0) {
     return NextResponse.json({ error: "账户不存在" }, { status: 400 });
   }
