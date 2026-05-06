@@ -25,8 +25,8 @@ export function ChartContainer({
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: "rgba(63,63,70,0.2)" },
-        horzLines: { color: "rgba(63,63,70,0.2)" },
+        vertLines: { visible: false },
+        horzLines: { visible: false },
       },
       crosshair: {
         vertLine: { color: "rgba(63,63,70,0.4)", width: 1, style: 2 },
@@ -46,16 +46,6 @@ export function ChartContainer({
       height,
     });
     chartRef.current = chart;
-
-    // Track attribution requirement
-    const link = document.createElement("a");
-    link.href = "https://www.tradingview.com/lightweight-charts/";
-    link.textContent = "Powered by TradingView";
-    link.style.cssText =
-      "position:absolute;bottom:4px;right:8px;font-size:9px;color:#52525b;text-decoration:none;opacity:0.5";
-    link.target = "_blank";
-    containerRef.current.style.position = "relative";
-    containerRef.current.appendChild(link);
 
     children(chart);
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { ChartContainer } from "./chart-container";
-import { HistogramSeries, LineSeries } from "lightweight-charts";
+import { AreaSeries, LineSeries } from "lightweight-charts";
 
 interface DataPoint {
   date: string;
@@ -18,9 +18,10 @@ export function ProfitCurve({ data, currency = "$" }: { data: DataPoint[]; curre
   const chartData = data.map((d) => ({
     time: d.date,
     value: d.value,
-    // Color per bar: green above zero, red below
-    color: d.value >= 0 ? "rgba(52,211,153,0.7)" : "rgba(248,113,113,0.7)",
   }));
+
+  const hasPositive = chartData.some((d) => d.value > 0);
+  const hasNegative = chartData.some((d) => d.value < 0);
 
   return (
     <ChartContainer height={260}>
@@ -29,14 +30,9 @@ export function ProfitCurve({ data, currency = "$" }: { data: DataPoint[]; curre
           localization: { priceFormatter: (p: number) => fmtLabel(p) },
         });
 
-        const hist = chart.addSeries(HistogramSeries, {
-          priceFormat: { type: "custom", formatter: (p: number) => fmtLabel(p) },
-        });
-        hist.setData(chartData);
-
-        // Add a zero line for reference
+        // Zero reference line
         const zeroLine = chart.addSeries(LineSeries, {
-          color: "rgba(113,113,122,0.3)",
+          color: "rgba(113,113,122,0.25)",
           lineWidth: 1,
           priceFormat: { type: "custom", formatter: (p: number) => fmtLabel(p) },
         });
@@ -46,6 +42,16 @@ export function ProfitCurve({ data, currency = "$" }: { data: DataPoint[]; curre
           { time: firstDate, value: 0 },
           { time: lastDate, value: 0 },
         ]);
+
+        // Area series: green gradient when profitable, red when not
+        const area = chart.addSeries(AreaSeries, {
+          lineColor: hasPositive ? "#34d399" : "#f87171",
+          topColor: hasPositive ? "rgba(52,211,153,0.25)" : "rgba(248,113,113,0.25)",
+          bottomColor: "rgba(52,211,153,0)",
+          lineWidth: 2,
+          priceFormat: { type: "custom", formatter: (p: number) => fmtLabel(p) },
+        });
+        area.setData(chartData);
 
         chart.timeScale().fitContent();
       }}
