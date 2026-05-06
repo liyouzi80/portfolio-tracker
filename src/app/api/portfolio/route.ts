@@ -215,8 +215,20 @@ export async function GET(req: NextRequest) {
     // Compute per-holding P&L (in holding currency and converted)
     for (const h of holdings) {
       const cached = priceCache.get(h.symbol + h.market);
-      const cp = cached?.price;
+      let cp = cached?.price;
       const pc = cached?.prevClose;
+
+      // If KV cache and live fetch both missed, fall back to last known price
+      // stored in the assets table (persisted across KV cache expirations).
+      if (!cp || cp <= 0) {
+        try {
+          const row = await d1.prepare(
+            "SELECT last_price FROM assets WHERE id = ?"
+          ).bind(h.assetId).first<{ last_price: number | null }>();
+          if (row?.last_price && row.last_price > 0) cp = row.last_price;
+        } catch { /* ignore */ }
+      }
+
       const rate = getRate(h.currency, baseCurrency);
       // Skip if cross-currency rate is unavailable (e.g. rates-fetch never ran
       // for this currency pair). A 0 rate would silently zero out the holding.
