@@ -148,10 +148,23 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Live fetch for missing
+    // Live fetch for missing — use Longbridge for HK, Tencent for CN/US
     if (missingPrices.length > 0) {
-      const { fetchTencentPrices } = await import("@/lib/price");
-      const livePrices = await fetchTencentPrices(missingPrices);
+      const hkSymbols = missingPrices.filter(p => p.market === "HK");
+      const otherSymbols = missingPrices.filter(p => p.market !== "HK");
+
+      const { fetchTencentPrices, fetchLongbridgePrices } = await import("@/lib/price");
+
+      // Fetch HK via Longbridge (primary), Tencent (fallback)
+      const lbPrices = hkSymbols.length > 0 ? await fetchLongbridgePrices(hkSymbols) : new Map();
+      const hkMissedByLB = hkSymbols.filter(s => !lbPrices.has(`${s.market}:${s.symbol}`));
+      const tencentLBPrices = hkMissedByLB.length > 0 ? await fetchTencentPrices(hkMissedByLB) : new Map();
+
+      // Fetch CN/US via Tencent
+      const tencentPrices = otherSymbols.length > 0 ? await fetchTencentPrices(otherSymbols) : new Map();
+
+      // Merge all live prices (Longbridge HK + Tencent HK fallback + Tencent CN/US)
+      const livePrices = new Map([...lbPrices, ...tencentLBPrices, ...tencentPrices]);
       // Parallel KV writes
       await Promise.all(
         Array.from(livePrices.entries()).map(async ([key, data]) => {

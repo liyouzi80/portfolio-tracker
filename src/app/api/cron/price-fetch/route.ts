@@ -27,7 +27,10 @@ export async function GET(req: NextRequest) {
 
     // 2. Longbridge
     if (price === null) {
-      try { price = await fetchLongbridgePrice(asset.symbol, asset.market); if (price !== null) source = "longbridge"; } catch { /* fallback */ }
+      try {
+        const lb = await fetchLongbridgePrice(asset.symbol, asset.market);
+        if (lb) { price = lb.price; source = "longbridge"; }
+      } catch { /* fallback */ }
     }
 
     // 3. Finnhub (US stocks only)

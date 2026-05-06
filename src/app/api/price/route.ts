@@ -32,8 +32,8 @@ export async function GET(req: NextRequest) {
   // 2. Longbridge (if configured)
   if (price === null) {
     try {
-      price = await fetchLongbridgePrice(symbol, market);
-      if (price !== null) source = "longbridge";
+      const lb = await fetchLongbridgePrice(symbol, market);
+      if (lb) { price = lb.price; name = lb.name; prevClose = lb.prevClose; source = "longbridge"; }
     } catch { /* fallback */ }
   }
 

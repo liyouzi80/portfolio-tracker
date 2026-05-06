@@ -181,7 +181,7 @@ async function signRequest(
   return `HMAC-SHA256 SignedHeaders=${signedHeaders}, Signature=${signature}`;
 }
 
-export async function fetchLongbridgePrice(symbol: string, market: string): Promise<number | null> {
+export async function fetchLongbridgePrice(symbol: string, market: string): Promise<{ price: number; name: string; prevClose?: number } | null> {
   const env = getPlatformEnv() as unknown as Record<string, string | undefined>;
   const appKey = env?.LONGPORT_APP_KEY || env?.LONGBRIDGE_APP_KEY;
   const appSecret = env?.LONGPORT_APP_SECRET || env?.LONGBRIDGE_APP_SECRET;
@@ -220,8 +220,30 @@ export async function fetchLongbridgePrice(symbol: string, market: string): Prom
 
     const price = quote.last_done ?? quote.lastDone ?? quote.last_price ?? quote.lastPrice ?? quote.price;
     if (price === undefined || price === null) return null;
-    return typeof price === "number" ? price : Number(price);
+    const prevClose = quote.prev_close ?? quote.prevClose ?? undefined;
+    const name = quote.name_en ?? quote.nameEn ?? quote.name_cn ?? quote.nameCn ?? symbol;
+    return { price: typeof price === "number" ? price : Number(price), name, prevClose };
   } catch {
     return null;
   }
+}
+
+// --- Longbridge batch fetch (parallel, one request per symbol) ---
+export async function fetchLongbridgePrices(
+  symbols: Array<{ symbol: string; market: string }>
+): Promise<Map<string, { price: number; name: string; prevClose?: number }>> {
+  const result = new Map<string, { price: number; name: string; prevClose?: number }>();
+  if (symbols.length === 0) return result;
+
+  const results = await Promise.all(
+    symbols.map(async (s) => {
+      const data = await fetchLongbridgePrice(s.symbol, s.market);
+      return { key: `${s.market}:${s.symbol}`, data };
+    })
+  );
+
+  for (const { key, data } of results) {
+    if (data) result.set(key, data);
+  }
+  return result;
 }

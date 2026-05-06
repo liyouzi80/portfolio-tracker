@@ -19,13 +19,13 @@ export async function POST(_req: NextRequest) {
   if (lbConfigured) {
     lbResult.configured = true;
     try {
-      const price = await fetchLongbridgePrice("AAPL", "US");
-      if (price !== null) {
+      const lb = await fetchLongbridgePrice("AAPL", "US");
+      if (lb !== null) {
         lbResult.ok = true;
         // If Longbridge works, return immediately
         return NextResponse.json({
           success: true,
-          price,
+          price: lb.price,
           symbol: "AAPL.US",
           source: "longbridge",
           tencent: { ok: tencentOk, price: tencent?.price },
