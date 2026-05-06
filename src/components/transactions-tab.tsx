@@ -11,6 +11,7 @@ import { TransactionSheet } from "./transaction-sheet";
 import { ImportSheet } from "./import-sheet";
 import { Plus, Upload, Search, Trash2, Loader2, Pencil } from "lucide-react";
 import { toast } from "sonner";
+import { fmtMoney, fmtQuantity } from "@/lib/format";
 
 interface Txn {
   id: string;
@@ -264,11 +265,11 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
                       {typeLabels[t.type] ?? t.type}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right font-mono">{t.quantity.toLocaleString()}</TableCell>
-                  <TableCell className="text-right font-mono">{t.currency} {t.price.toFixed(2)}</TableCell>
-                  <TableCell className="text-right font-mono text-zinc-500">{t.currency} {t.fee.toFixed(2)}</TableCell>
-                  <TableCell className="text-right font-mono">
-                    {t.currency} {(t.quantity * t.price + (t.type === "sell" ? -t.fee : t.fee)).toLocaleString()}
+                  <TableCell className="text-right font-mono tabular-nums">{fmtQuantity(t.quantity)}</TableCell>
+                  <TableCell className="text-right font-mono tabular-nums">{t.currency} {fmtMoney(t.price)}</TableCell>
+                  <TableCell className="text-right font-mono tabular-nums text-zinc-500">{t.currency} {fmtMoney(t.fee)}</TableCell>
+                  <TableCell className="text-right font-mono tabular-nums">
+                    {t.currency} {fmtMoney(t.quantity * t.price + (t.type === "sell" ? -t.fee : t.fee))}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-0.5">

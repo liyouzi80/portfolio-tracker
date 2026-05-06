@@ -3,6 +3,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink } from "lucide-react";
+import { fmtMoney, fmtQuantity, fmtMoneySigned, fmtPercent } from "@/lib/format";
 
 interface Holding {
   assetId: string;
@@ -85,18 +86,18 @@ export function HoldingsTable({ data, onSymbolClick }: { data: Holding[]; onSymb
                 {marketLabels[h.market] ?? h.market}
               </Badge>
             </TableCell>
-            <TableCell className="text-right font-mono">{h.quantity}</TableCell>
-            <TableCell className="text-right font-mono">
-              {h.currency} {h.avgCost.toFixed(2)}
+            <TableCell className="text-right font-mono tabular-nums">{fmtQuantity(h.quantity)}</TableCell>
+            <TableCell className="text-right font-mono tabular-nums">
+              {h.currency} {fmtMoney(h.avgCost)}
             </TableCell>
-            <TableCell className="text-right font-mono">
-              {h.currency} {h.totalCost.toLocaleString()}
+            <TableCell className="text-right font-mono tabular-nums">
+              {h.currency} {fmtMoney(h.totalCost)}
             </TableCell>
-            <TableCell className={`text-right font-mono ${
+            <TableCell className={`text-right font-mono tabular-nums ${
               h.pnl === undefined ? 'text-zinc-500' : h.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'
             }`}>
-              {h.pnl !== undefined ? `${h.pnl >= 0 ? '+' : ''}${h.currency} ${Math.abs(h.pnl).toLocaleString()}` : "--"}
-              {h.pnlPct !== undefined && <span className="text-xs ml-1">({h.pnlPct >= 0 ? '+' : ''}{h.pnlPct}%)</span>}
+              {h.pnl !== undefined ? `${h.currency} ${fmtMoneySigned(h.pnl)}` : "--"}
+              {h.pnlPct !== undefined && <span className="text-xs ml-1">({fmtPercent(h.pnlPct)})</span>}
             </TableCell>
             <TableCell>
               <a

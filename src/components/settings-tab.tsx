@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AccountSheet } from "./account-sheet";
 import { AlertSheet } from "./alert-sheet";
-import { Plus, Pencil, Trash2, Zap, Fingerprint, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Zap, Fingerprint, Loader2, Download } from "lucide-react";
 import { toast } from "sonner";
 
 const PRF_SALT = "portfolio-tracker-prf-salt-v1";
@@ -431,6 +431,28 @@ export function SettingsTab() {
               ? "长桥凭证通过 GitHub Secrets (LONGBRIDGE_APP_KEY / APP_SECRET / ACCESS_TOKEN) 注入，无需在此填写。"
               : "Yahoo Finance 免费无需 API Key，但稳定性一般。"}
           </p>
+        </CardContent>
+      </Card>
+
+      {/* Data Export / Escape Hatch */}
+      <Card className="t-tab-content t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">数据备份</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-zinc-500 leading-relaxed">
+            一键导出所有交易记录、账户、持仓快照和汇率数据。建议定期下载备份，避免因密码丢失导致数据无法找回。
+          </p>
+          <a
+            href="/api/export"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-300 hover:text-white transition-colors px-3 py-2 rounded-lg border border-white/[0.08] hover:border-white/[0.15] hover:bg-white/[0.04]"
+            download
+          >
+            <Download className="h-3.5 w-3.5" />
+            下载 CSV 备份
+          </a>
         </CardContent>
       </Card>
 

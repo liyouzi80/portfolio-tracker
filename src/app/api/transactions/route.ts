@@ -47,22 +47,32 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(enriched);
 }
 
+async function txHash(body: { accountId: string; assetId: string; type: string; quantity: number; price: number; fee?: number; date: string }): Promise<string> {
+  const raw = `${body.date}|${body.accountId}|${body.assetId}|${body.type}|${body.quantity}|${body.price}|${body.fee ?? 0}`;
+  const enc = new TextEncoder();
+  const hash = await crypto.subtle.digest("SHA-256", enc.encode(raw));
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
 export async function POST(req: NextRequest) {
-  const db = getDb(getPlatformEnv().DB);
+  const { DB: d1 } = getPlatformEnv();
   const body = await req.json() as { accountId: string; assetId: string; type: string; quantity: number; price: number; fee?: number; date: string; notes?: string };
+
+  // Ensure tx_hash column exists
+  try { await d1.prepare("ALTER TABLE transactions ADD COLUMN tx_hash TEXT").run(); } catch { /* exists */ }
+
+  const hash = await txHash(body);
+
+  // Check for duplicate
+  const existing = await d1.prepare("SELECT id FROM transactions WHERE tx_hash = ?").bind(hash).first<{ id: string }>();
+  if (existing) return NextResponse.json({ id: existing.id, deduped: true });
+
   const id = cuid();
-  await db.insert(transactions).values({
-    id,
-    accountId: body.accountId,
-    assetId: body.assetId,
-    type: body.type,
-    quantity: body.quantity,
-    price: body.price,
-    fee: body.fee ?? 0,
-    date: body.date,
-    notes: body.notes,
-    createdAt: new Date().toISOString(),
-  });
+  const now = new Date().toISOString();
+  await d1.prepare(
+    "INSERT INTO transactions (id, account_id, asset_id, type, quantity, price, fee, date, notes, tx_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).bind(id, body.accountId, body.assetId, body.type, body.quantity, body.price, body.fee ?? 0, body.date, body.notes || null, hash, now).run();
+
   return NextResponse.json({ id });
 }
 

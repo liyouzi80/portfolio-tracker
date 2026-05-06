@@ -6,6 +6,13 @@ import { getPlatformEnv } from "@/lib/env";
 import { eq, and } from "drizzle-orm";
 import * as XLSX from "xlsx";
 
+async function txHash(body: { accountId: string; assetId: string; type: string; quantity: number; price: number; fee: number; date: string }): Promise<string> {
+  const raw = `${body.date}|${body.accountId}|${body.assetId}|${body.type}|${body.quantity}|${body.price}|${body.fee}`;
+  const enc = new TextEncoder();
+  const hash = await crypto.subtle.digest("SHA-256", enc.encode(raw));
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
 // Currency lookup by market code (mirror of frontend marketCurrency map).
 const MARKET_TO_CURRENCY: Record<string, string> = {
   US: "USD", HK: "HKD", CN: "CNY", JP: "JPY", KR: "KRW",
@@ -190,31 +197,35 @@ export async function POST(req: NextRequest) {
     })
   );
 
-  // ---- Pass 2: insert transactions ----
-  const now = new Date().toISOString();
-  const txnRows = parsed.map((p) => ({
-    id: cuid(),
-    accountId,
-    assetId: assetIdByPair.get(`${p.symbol}:${p.market}`)!,
-    type: p.type,
-    quantity: p.quantity,
-    price: p.price,
-    fee: p.fee,
-    date: p.date,
-    notes: p.notes,
-    createdAt: now,
-  }));
+  // ---- Pass 2: insert transactions with dedup ----
+  // Ensure tx_hash column exists
+  try { await getPlatformEnv().DB.prepare("ALTER TABLE transactions ADD COLUMN tx_hash TEXT").run(); } catch { /* exists */ }
 
-  // Batch insert in chunks to stay well under D1's per-statement parameter limit
-  // (~999 vars). Each row uses 9 fields, so 100 rows = 900 binds.
-  const CHUNK = 100;
-  for (let i = 0; i < txnRows.length; i += CHUNK) {
-    await db.insert(transactions).values(txnRows.slice(i, i + CHUNK));
+  const now = new Date().toISOString();
+  const { DB: d1 } = getPlatformEnv();
+  let inserted = 0;
+  let skipped = errors.length;
+
+  for (const p of parsed) {
+    const assetId = assetIdByPair.get(`${p.symbol}:${p.market}`);
+    if (!assetId) { skipped++; continue; }
+
+    const hash = await txHash({ accountId, assetId, type: p.type, quantity: p.quantity, price: p.price, fee: p.fee, date: p.date });
+
+    // Skip if duplicate
+    const existing = await d1.prepare("SELECT id FROM transactions WHERE tx_hash = ?").bind(hash).first<{ id: string }>();
+    if (existing) { skipped++; continue; }
+
+    const id = cuid();
+    await d1.prepare(
+      "INSERT INTO transactions (id, account_id, asset_id, type, quantity, price, fee, date, notes, tx_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(id, accountId, assetId, p.type, p.quantity, p.price, p.fee, p.date, p.notes || null, hash, now).run();
+    inserted++;
   }
 
   return NextResponse.json({
-    count: txnRows.length,
-    skipped: errors.length,
+    count: inserted,
+    skipped,
     errors: errors.slice(0, 20), // cap echo
   });
 }

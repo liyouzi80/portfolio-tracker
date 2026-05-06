@@ -36,6 +36,7 @@ export const transactions = sqliteTable("transactions", {
   fee: real("fee").default(0),
   date: text("date").notNull(), // ISO date
   notes: text("notes"),
+  txHash: text("tx_hash"), // SHA-256 dedup key: date|account|asset|type|qty|price|fee
   createdAt: text("created_at").notNull(),
 });
 
