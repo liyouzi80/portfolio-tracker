@@ -3,7 +3,7 @@ import { getDb } from "@/db";
 import { exchangeRates } from "@/db/schema";
 import { getPlatformEnv } from "@/lib/env";
 
-const API_URL = "https://api.exchangerate-api.com/v4/latest/CNY";
+const API_URL = "https://api.exchangerate-api.com/v4/latest/USD";
 
 async function fetchWithRetry(url: string, retries = 3): Promise<Response> {
   for (let i = 0; i < retries; i++) {
@@ -36,7 +36,9 @@ export async function GET(req: NextRequest) {
     const rates = data.rates;
     const now = new Date().toISOString();
 
-    const currencies = ["CNY", "HKD", "USD"];
+    // All currencies used by supported markets. Must be comprehensive
+    // so getRate() never returns 0 for any legitimate currency pair.
+    const currencies = ["CNY", "HKD", "USD", "JPY", "KRW", "EUR", "GBP", "CHF", "CAD", "AUD", "TWD", "INR"];
     for (const from of currencies) {
       for (const to of currencies) {
         if (from === to) continue;

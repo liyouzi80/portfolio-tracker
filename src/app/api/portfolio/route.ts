@@ -50,16 +50,31 @@ export async function GET(req: NextRequest) {
     : await db.select().from(accounts).all();
 
   const allRates = await db.select().from(exchangeRates).all();
+  if (allRates.length === 0) {
+    console.error("exchange_rates table is empty — portfolio values will be inaccurate");
+  }
+  const rateCache = new Map<string, number>();
   const getRate = (from: string, to: string): number => {
     if (from === to) return 1;
+    const key = `${from}→${to}`;
+    if (rateCache.has(key)) return rateCache.get(key)!;
+
+    let rate = 0;
     const direct = allRates.find(r => r.fromCurrency === from && r.toCurrency === to);
-    if (direct) return direct.rate;
-    const inverse = allRates.find(r => r.fromCurrency === to && r.toCurrency === from);
-    if (inverse && inverse.rate > 0) return 1 / inverse.rate;
-    const fromCny = allRates.find(r => r.fromCurrency === from && r.toCurrency === "CNY");
-    const toCny = allRates.find(r => r.fromCurrency === to && r.toCurrency === "CNY");
-    if (fromCny && toCny && toCny.rate > 0) return fromCny.rate / toCny.rate;
-    return 0; // No rate available — caller should treat as missing
+    if (direct) rate = direct.rate;
+    else {
+      const inverse = allRates.find(r => r.fromCurrency === to && r.toCurrency === from);
+      if (inverse && inverse.rate > 0) rate = 1 / inverse.rate;
+      else {
+        const fromCny = allRates.find(r => r.fromCurrency === from && r.toCurrency === "CNY");
+        const toCny = allRates.find(r => r.fromCurrency === to && r.toCurrency === "CNY");
+        if (fromCny && toCny && toCny.rate > 0) rate = fromCny.rate / toCny.rate;
+        // If still 0, the currency pair is truly unavailable.
+        // This is a data problem — rates-fetch cron must cover all active currencies.
+      }
+    }
+    rateCache.set(key, rate);
+    return rate;
   };
 
   const { PRICE_CACHE } = getPlatformEnv();
@@ -200,12 +215,15 @@ export async function GET(req: NextRequest) {
           h.todayPnlInBase = Math.round((cp - pc) * h.quantity * rate * 100) / 100;
         }
       } else {
-        // No real-time price: use avgCost so P&L = 0, market value matches cost
-        h.currentPrice = h.avgCost;
-        h.pnl = 0;
-        h.pnlPct = 0;
-        h.pnlInBase = 0;
-        h.marketValueInBase = Math.round(h.avgCost * h.quantity * rate * 100) / 100;
+        // No real-time price available. NEVER fall back to avgCost — that would
+        // distort market value for holdings with negative cost basis (from
+        // multiple round-trips). Leave P&L fields undefined so the UI shows "--".
+        h.currentPrice = undefined;
+        h.pnl = undefined;
+        h.pnlPct = undefined;
+        h.pnlInBase = undefined;
+        h.marketValueInBase = undefined;
+        // todayPnl stays undefined (no prevClose → no contribution to portfolio total)
       }
     }
 
@@ -213,19 +231,28 @@ export async function GET(req: NextRequest) {
       (sum, h) => sum + h.totalCost * getRate(h.currency, acc.currency),
       0
     );
+    // Market value: only include holdings with real-time prices.
+    // Holdings without prices contribute 0 to total market value.
+    // This means total market value is a lower bound (conservative).
     const accountMarketValue = holdings.reduce((sum, h) => {
-      const price = h.currentPrice ?? h.avgCost;
-      return sum + price * h.quantity * getRate(h.currency, acc.currency);
+      if (h.currentPrice === undefined) return sum; // no price → skip (shows "--" in UI)
+      return sum + h.currentPrice * h.quantity * getRate(h.currency, acc.currency);
+    }, 0);
+    const pricedCost = holdings.reduce((sum, h) => {
+      if (h.currentPrice === undefined) return sum;
+      return sum + h.totalCost * getRate(h.currency, acc.currency);
     }, 0);
 
-    const unrealizedPnl = accountMarketValue - accountTotalCost;
+    // Unrealized P&L only for priced holdings (matched cost vs market value)
+    const unrealizedPnl = accountMarketValue - pricedCost;
+    const totalPnl = unrealizedPnl + realizedPnl;
     accountSummaries.push({
       id: acc.id,
       name: acc.name,
       currency: acc.currency,
-      totalCost: Math.round(accountTotalCost * 100) / 100,
-      totalMarketValue: Math.round(accountMarketValue * 100) / 100,
-      totalPnl: Math.round((unrealizedPnl + realizedPnl) * 100) / 100,
+      totalCost: Math.round(accountTotalCost * 100) / 100,         // full cost (all holdings)
+      totalMarketValue: Math.round(accountMarketValue * 100) / 100, // priced only
+      totalPnl: Math.round(totalPnl * 100) / 100,
       realizedPnl: Math.round(realizedPnl * 100) / 100,
       unrealizedPnl: Math.round(unrealizedPnl * 100) / 100,
       holdings,
