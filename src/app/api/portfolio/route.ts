@@ -191,15 +191,18 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Live fetch for missing — use Longbridge for HK, Tencent for CN/US
+    // Live fetch for missing — dispatch per market to optimal source
     if (missingPrices.length > 0) {
       const hkSymbols = missingPrices.filter(p => p.market === "HK");
       const usSymbols = missingPrices.filter(p => p.market === "US");
-      const otherSymbols = missingPrices.filter(p => p.market !== "HK" && p.market !== "US");
+      const cnSymbols = missingPrices.filter(p => p.market === "CN");
+      // Markets Tencent can't handle: use Yahoo
+      const yahooMarkets = new Set(["JP", "KR", "GB", "DE", "FR", "NL", "ES", "IT", "CH", "CA", "AU", "TW", "IN"]);
+      const yahooSymbols = missingPrices.filter(p => yahooMarkets.has(p.market));
 
-      const { fetchTencentPrices, fetchLongbridgePrices, fetchFinnhubPrice } = await import("@/lib/price");
+      const { fetchTencentPrices, fetchLongbridgePrices, fetchFinnhubPrice, fetchYahooQuote } = await import("@/lib/price");
 
-      // Fetch HK via Longbridge (primary), Tencent (fallback)
+      // HK: Longbridge primary, Tencent fallback
       const lbPrices = hkSymbols.length > 0 ? await fetchLongbridgePrices(hkSymbols) : new Map();
       for (const [k, v] of lbPrices) {
         priceCache.set(k.split(":")[1] + k.split(":")[0], { price: v.price, prevClose: v.prevClose });
@@ -214,24 +217,40 @@ export async function GET(req: NextRequest) {
         PRICE_CACHE.put(`price:${market}:${symbol}`, JSON.stringify({ symbol, market, price: v.price, prevClose: v.prevClose, name: v.name || symbol, updatedAt: Date.now() }), { expirationTtl: 86400 }).catch(() => {});
       }
 
-      // Fetch CN/other via Tencent
-      const tencentPrices = otherSymbols.length > 0 ? await fetchTencentPrices(otherSymbols) : new Map();
-      for (const [k, v] of tencentPrices) {
-        priceCache.set(k.split(":")[1] + k.split(":")[0], { price: v.price, prevClose: v.prevClose });
-        const [market, symbol] = k.split(":");
-        PRICE_CACHE.put(`price:${market}:${symbol}`, JSON.stringify({ symbol, market, price: v.price, prevClose: v.prevClose, name: v.name || symbol, updatedAt: Date.now() }), { expirationTtl: 86400 }).catch(() => {});
+      // CN: Tencent
+      if (cnSymbols.length > 0) {
+        const tencentCN = await fetchTencentPrices(cnSymbols);
+        for (const [k, v] of tencentCN) {
+          priceCache.set(k.split(":")[1] + k.split(":")[0], { price: v.price, prevClose: v.prevClose });
+          const [market, symbol] = k.split(":");
+          PRICE_CACHE.put(`price:${market}:${symbol}`, JSON.stringify({ symbol, market, price: v.price, prevClose: v.prevClose, name: v.name || symbol, updatedAt: Date.now() }), { expirationTtl: 86400 }).catch(() => {});
+        }
       }
 
-      // Fetch US via Finnhub (Tencent US endpoint blocks Workers, Finnhub is the only working US source)
+      // US: Finnhub (Tencent US endpoint blocks Workers, Finnhub has prevClose)
       if (usSymbols.length > 0) {
         const fhResults = await Promise.all(usSymbols.map(async (s) => {
           const fh = await fetchFinnhubPrice(s.symbol, s.market);
-          return { s, price: fh?.price ?? null };
+          return { s, price: fh?.price ?? null, prevClose: fh?.prevClose, name: fh?.name };
         }));
-        for (const { s, price } of fhResults) {
+        for (const { s, price, prevClose, name } of fhResults) {
           if (price) {
-            priceCache.set(s.symbol + s.market, { price });
-            PRICE_CACHE.put(`price:${s.market}:${s.symbol}`, JSON.stringify({ symbol: s.symbol, market: s.market, price, updatedAt: Date.now() }), { expirationTtl: 86400 }).catch(() => {});
+            priceCache.set(s.symbol + s.market, { price, prevClose });
+            PRICE_CACHE.put(`price:${s.market}:${s.symbol}`, JSON.stringify({ symbol: s.symbol, market: s.market, price, prevClose, name: name || s.symbol, updatedAt: Date.now() }), { expirationTtl: 86400 }).catch(() => {});
+          }
+        }
+      }
+
+      // JP/KR/GB/... : Yahoo (parallel, free, multi-market)
+      if (yahooSymbols.length > 0) {
+        const yahooResults = await Promise.all(yahooSymbols.map(async (s) => {
+          const yq = await fetchYahooQuote(s.symbol, s.market);
+          return { s, price: yq?.price ?? null, prevClose: yq?.prevClose, name: yq?.name };
+        }));
+        for (const { s, price, prevClose, name } of yahooResults) {
+          if (price) {
+            priceCache.set(s.symbol + s.market, { price, prevClose });
+            PRICE_CACHE.put(`price:${s.market}:${s.symbol}`, JSON.stringify({ symbol: s.symbol, market: s.market, price, prevClose, name: name || s.symbol, updatedAt: Date.now() }), { expirationTtl: 86400 }).catch(() => {});
           }
         }
       }

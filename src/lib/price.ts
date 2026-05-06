@@ -98,8 +98,27 @@ export async function fetchYahooPrice(symbol: string, market: string): Promise<n
   return q?.price ?? null;
 }
 
-export async function fetchYahooQuote(symbol: string, market: string): Promise<{ price: number; name?: string } | null> {
-  const suffix = market === "CN" ? cnSuffix(symbol) : market === "HK" ? ".HK" : "";
+function yahooSuffix(market: string): string {
+  if (market === "CN") return ""; // handled by cnSuffix(symbol)
+  if (market === "HK") return ".HK";
+  if (market === "JP") return ".T";
+  if (market === "KR") return ".KS";
+  if (market === "GB") return ".L";
+  if (market === "DE") return ".DE";
+  if (market === "FR") return ".PA";
+  if (market === "NL") return ".AS";
+  if (market === "ES") return ".MC";
+  if (market === "IT") return ".MI";
+  if (market === "CH") return ".SW";
+  if (market === "CA") return ".TO";
+  if (market === "AU") return ".AX";
+  if (market === "TW") return ".TW";
+  if (market === "IN") return ".NS";
+  return ""; // US and unknown
+}
+
+export async function fetchYahooQuote(symbol: string, market: string): Promise<{ price: number; name?: string; prevClose?: number } | null> {
+  const suffix = market === "CN" ? cnSuffix(symbol) : yahooSuffix(market);
   const yahooSymbol = symbol + suffix;
 
   const url = `https://query2.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?interval=1d&range=1d`;
@@ -111,10 +130,14 @@ export async function fetchYahooQuote(symbol: string, market: string): Promise<{
       },
     });
     if (!res.ok) return null;
-    const data = await res.json() as { chart: { result?: [{ meta?: { regularMarketPrice?: number; shortName?: string; longName?: string } }] } };
+    const data = await res.json() as { chart: { result?: [{ meta?: { regularMarketPrice?: number; chartPreviousClose?: number; previousClose?: number; shortName?: string; longName?: string } }] } };
     const meta = data.chart?.result?.[0]?.meta;
     if (!meta?.regularMarketPrice) return null;
-    return { price: meta.regularMarketPrice, name: meta.shortName || meta.longName };
+    return {
+      price: meta.regularMarketPrice,
+      name: meta.shortName || meta.longName,
+      prevClose: meta.chartPreviousClose || meta.previousClose || undefined,
+    };
   } catch {
     return null;
   }
@@ -123,7 +146,7 @@ export async function fetchYahooQuote(symbol: string, market: string): Promise<{
 // --- Finnhub (free tier: 60 req/min, US stocks only) ---
 // API key stored as Worker secret FINNHUB_API_KEY
 
-export async function fetchFinnhubPrice(symbol: string, market: string): Promise<{ price: number; name: string } | null> {
+export async function fetchFinnhubPrice(symbol: string, market: string): Promise<{ price: number; name: string; prevClose?: number } | null> {
   if (market !== "US") return null; // Finnhub is US-only
   const env = getPlatformEnv() as unknown as Record<string, string | undefined>;
   const apiKey = env?.FINNHUB_API_KEY;
@@ -145,7 +168,7 @@ export async function fetchFinnhubPrice(symbol: string, market: string): Promise
       }
     } catch { /* use symbol as name */ }
 
-    return { price: data.c, name };
+    return { price: data.c, name, prevClose: data.pc || undefined };
   } catch {
     return null;
   }

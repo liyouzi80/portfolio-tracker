@@ -35,35 +35,36 @@ export async function GET(req: NextRequest) {
     const batch = allAssets.slice(i, i + BATCH);
     const batchResults = await Promise.all(batch.map(async (asset) => {
       let price: number | null = null;
+      let prevClose: number | undefined;
       let displayName: string | null = null;
       let source = "none";
 
       const tencent = await fetchTencentPrice(asset.symbol, asset.market);
-      if (tencent) { price = tencent.price; displayName = tencent.name; source = "tencent"; }
+      if (tencent) { price = tencent.price; prevClose = tencent.prevClose; displayName = tencent.name; source = "tencent"; }
 
       if (price === null) {
         try {
           const lb = await fetchLongbridgePrice(asset.symbol, asset.market);
-          if (lb) { price = lb.price; displayName = lb.name; source = "longbridge"; }
+          if (lb) { price = lb.price; prevClose = lb.prevClose; displayName = lb.name; source = "longbridge"; }
         } catch { /* fallback */ }
       }
 
       if (price === null && asset.market === "US") {
         const fh = await fetchFinnhubPrice(asset.symbol, asset.market);
-        if (fh) { price = fh.price; displayName = fh.name; source = "finnhub"; }
+        if (fh) { price = fh.price; prevClose = fh.prevClose; displayName = fh.name; source = "finnhub"; }
       }
 
       if (price === null) {
         try {
           const yq = await fetchYahooQuote(asset.symbol, asset.market);
-          if (yq) { price = yq.price; displayName = yq.name || null; source = "yahoo"; }
+          if (yq) { price = yq.price; prevClose = yq.prevClose; displayName = yq.name || null; source = "yahoo"; }
         } catch { source = "error"; }
       }
 
-      return { asset, price, displayName, source };
+      return { asset, price, prevClose, displayName, source };
     }));
 
-    for (const { asset, price, displayName, source } of batchResults) {
+    for (const { asset, price, prevClose, displayName, source } of batchResults) {
       if (price === null) continue;
 
       const cnName = getChineseName(asset.symbol, asset.market);
@@ -71,7 +72,7 @@ export async function GET(req: NextRequest) {
 
       pendingWrites.push(
         PRICE_CACHE.put(`price:${asset.market}:${asset.symbol}`, JSON.stringify({
-          symbol: asset.symbol, market: asset.market, name: nameForCache, price, source, updatedAt: Date.now(),
+          symbol: asset.symbol, market: asset.market, name: nameForCache, price, prevClose, source, updatedAt: Date.now(),
         }), { expirationTtl: 86400 }).catch(() => {})
       );
 
