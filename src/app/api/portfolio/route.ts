@@ -181,32 +181,43 @@ export async function GET(req: NextRequest) {
     // Live fetch for missing — use Longbridge for HK, Tencent for CN/US
     if (missingPrices.length > 0) {
       const hkSymbols = missingPrices.filter(p => p.market === "HK");
-      const otherSymbols = missingPrices.filter(p => p.market !== "HK");
+      const usSymbols = missingPrices.filter(p => p.market === "US");
+      const otherSymbols = missingPrices.filter(p => p.market !== "HK" && p.market !== "US");
 
-      const { fetchTencentPrices, fetchLongbridgePrices } = await import("@/lib/price");
+      const { fetchTencentPrices, fetchLongbridgePrices, fetchFinnhubPrice } = await import("@/lib/price");
 
       // Fetch HK via Longbridge (primary), Tencent (fallback)
       const lbPrices = hkSymbols.length > 0 ? await fetchLongbridgePrices(hkSymbols) : new Map();
+      for (const [k, v] of lbPrices) priceCache.set(k.split(":")[1] + k.split(":")[0], { price: v.price, prevClose: v.prevClose });
       const hkMissedByLB = hkSymbols.filter(s => !lbPrices.has(`${s.market}:${s.symbol}`));
-      const tencentLBPrices = hkMissedByLB.length > 0 ? await fetchTencentPrices(hkMissedByLB) : new Map();
+      const tencentHK = hkMissedByLB.length > 0 ? await fetchTencentPrices(hkMissedByLB) : new Map();
+      for (const [k, v] of tencentHK) priceCache.set(k.split(":")[1] + k.split(":")[0], { price: v.price, prevClose: v.prevClose });
 
-      // Fetch CN/US via Tencent
+      // Fetch CN/other via Tencent
       const tencentPrices = otherSymbols.length > 0 ? await fetchTencentPrices(otherSymbols) : new Map();
+      for (const [k, v] of tencentPrices) priceCache.set(k.split(":")[1] + k.split(":")[0], { price: v.price, prevClose: v.prevClose });
 
-      // Merge all live prices (Longbridge HK + Tencent HK fallback + Tencent CN/US)
-      const livePrices = new Map([...lbPrices, ...tencentLBPrices, ...tencentPrices]);
-      // Parallel KV writes
+      // Fetch US via Finnhub (Tencent US endpoint blocks Workers, Finnhub is the only working US source)
+      if (usSymbols.length > 0) {
+        const fhResults = await Promise.all(usSymbols.map(async (s) => {
+          const fh = await fetchFinnhubPrice(s.symbol, s.market);
+          return { key: `${s.symbol}${s.market}`, price: fh?.price ?? null };
+        }));
+        for (const { key, price } of fhResults) {
+          if (price) priceCache.set(key, { price });
+        }
+      }
+
+      // Write fetched prices back to KV
       await Promise.all(
-        Array.from(livePrices.entries()).map(async ([key, data]) => {
-          const [market, symbol] = key.split(":");
-          priceCache.set(symbol + market, { price: data.price, prevClose: (data as any).prevClose });
+        Array.from(priceCache.entries()).map(async ([k, data]) => {
           try {
-            const cacheKey = `price:${market}:${symbol}`;
-            await PRICE_CACHE.put(
-              cacheKey,
-              JSON.stringify({ symbol, market, price: data.price, prevClose: (data as any).prevClose, name: data.name, source: "tencent", updatedAt: Date.now() }),
-              { expirationTtl: 86400 } // 24h — price-fetch cron refreshes daily
-            );
+            // Find market for this key to build proper cache key
+            const h = holdings.find(h => h.symbol + h.market === k);
+            if (h && data.price) {
+              const cacheKey = `price:${h.market}:${h.symbol}`;
+              await PRICE_CACHE.put(cacheKey, JSON.stringify({ symbol: h.symbol, market: h.market, price: data.price, prevClose: data.prevClose, name: h.name, updatedAt: Date.now() }), { expirationTtl: 86400 });
+            }
           } catch { /* ignore */ }
         })
       );
