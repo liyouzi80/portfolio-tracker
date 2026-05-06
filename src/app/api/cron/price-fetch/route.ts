@@ -6,6 +6,8 @@ import { fetchTencentPrice, fetchFinnhubPrice, fetchLongbridgePrice, fetchYahooQ
 import { getChineseName } from "@/lib/stock-names";
 import { eq } from "drizzle-orm";
 
+let migrationsRun = false;
+
 export async function GET(req: NextRequest) {
   const env = getPlatformEnv() as unknown as Record<string, string | undefined>;
   const cronSecret = env?.CRON_SECRET;
@@ -17,9 +19,13 @@ export async function GET(req: NextRequest) {
 
   const allAssets = await db.select().from(assets).all();
 
-  // Ensure columns exist
-  try { await d1.prepare("ALTER TABLE assets ADD COLUMN last_price REAL").run(); } catch { /* exists */ }
-  try { await d1.prepare("ALTER TABLE assets ADD COLUMN last_price_updated_at TEXT").run(); } catch { /* exists */ }
+  if (!migrationsRun) {
+    try { await d1.prepare("ALTER TABLE assets ADD COLUMN last_price REAL").run(); } catch { /* exists */ }
+    try { await d1.prepare("ALTER TABLE assets ADD COLUMN last_price_updated_at TEXT").run(); } catch { /* exists */ }
+    migrationsRun = true;
+  }
+
+  const pendingWrites: Promise<unknown>[] = [];
 
   // Process in batches of 5 to respect Finnhub rate limits (60 req/min).
   const BATCH = 5;
@@ -63,17 +69,23 @@ export async function GET(req: NextRequest) {
       const cnName = getChineseName(asset.symbol, asset.market);
       const nameForCache = cnName || (displayName && displayName !== asset.symbol ? displayName : asset.symbol);
 
-      PRICE_CACHE.put(`price:${asset.market}:${asset.symbol}`, JSON.stringify({
-        symbol: asset.symbol, market: asset.market, name: nameForCache, price, source, updatedAt: Date.now(),
-      }), { expirationTtl: 86400 }).catch(() => {});
+      pendingWrites.push(
+        PRICE_CACHE.put(`price:${asset.market}:${asset.symbol}`, JSON.stringify({
+          symbol: asset.symbol, market: asset.market, name: nameForCache, price, source, updatedAt: Date.now(),
+        }), { expirationTtl: 86400 }).catch(() => {})
+      );
 
       const bestName = cnName || (displayName && displayName !== asset.symbol ? displayName : null);
       if (bestName && bestName !== asset.name) {
-        d1.prepare("UPDATE assets SET name = ?, last_price = ?, last_price_updated_at = ? WHERE id = ?")
-          .bind(bestName, price, new Date().toISOString(), asset.id).run().catch(() => {});
+        pendingWrites.push(
+          d1.prepare("UPDATE assets SET name = ?, last_price = ?, last_price_updated_at = ? WHERE id = ?")
+            .bind(bestName, price, new Date().toISOString(), asset.id).run().catch(() => {})
+        );
       } else {
-        d1.prepare("UPDATE assets SET last_price = ?, last_price_updated_at = ? WHERE id = ?")
-          .bind(price, new Date().toISOString(), asset.id).run().catch(() => {});
+        pendingWrites.push(
+          d1.prepare("UPDATE assets SET last_price = ?, last_price_updated_at = ? WHERE id = ?")
+            .bind(price, new Date().toISOString(), asset.id).run().catch(() => {})
+        );
       }
 
       results.push({ symbol: asset.symbol, price, source });
@@ -87,12 +99,15 @@ export async function GET(req: NextRequest) {
           if (alert.conditionType === "price_above" && price > alert.threshold) triggered = true;
           if (alert.conditionType === "price_below" && price < alert.threshold) triggered = true;
           if (triggered) {
-            db.update(alerts).set({ triggeredAt: new Date().toISOString(), enabled: 0 }).where(eq(alerts.id, alert.id)).run().catch(() => {});
+            pendingWrites.push(
+              db.update(alerts).set({ triggeredAt: new Date().toISOString(), enabled: 0 }).where(eq(alerts.id, alert.id)).run().catch(() => {})
+            );
           }
         }
       } catch { /* alert check non-critical */ }
     }
   }
 
+  await Promise.all(pendingWrites);
   return NextResponse.json({ updated: results.length, results });
 }

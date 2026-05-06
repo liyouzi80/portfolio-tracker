@@ -6,6 +6,8 @@ import { getPlatformEnv } from "@/lib/env";
 import { eq, and } from "drizzle-orm";
 import * as XLSX from "xlsx";
 
+let migrationsRun = false;
+
 async function txHash(body: { accountId: string; assetId: string; type: string; quantity: number; price: number; fee: number; date: string }): Promise<string> {
   const raw = `${body.date}|${body.accountId}|${body.assetId}|${body.type}|${body.quantity}|${body.price}|${body.fee}`;
   const enc = new TextEncoder();
@@ -199,7 +201,10 @@ export async function POST(req: NextRequest) {
 
   // ---- Pass 2: insert transactions with dedup ----
   // Ensure tx_hash column exists
-  try { await getPlatformEnv().DB.prepare("ALTER TABLE transactions ADD COLUMN tx_hash TEXT").run(); } catch { /* exists */ }
+  if (!migrationsRun) {
+    try { await getPlatformEnv().DB.prepare("ALTER TABLE transactions ADD COLUMN tx_hash TEXT").run(); } catch { /* exists */ }
+    migrationsRun = true;
+  }
 
   const now = new Date().toISOString();
   const { DB: d1 } = getPlatformEnv();

@@ -6,6 +6,8 @@ import { fetchTencentPrices, fetchLongbridgePrices, fetchFinnhubPrice } from "@/
 import { eq, and } from "drizzle-orm";
 import { cuid } from "@/lib/cuid";
 
+let migrationsRun = false;
+
 export async function GET(req: NextRequest) {
   const env2 = getPlatformEnv() as unknown as Record<string, string | undefined>;
   const cronSecret = env2?.CRON_SECRET;
@@ -17,8 +19,10 @@ export async function GET(req: NextRequest) {
   const db = getDb(d1);
   const today = new Date().toISOString().slice(0, 10);
 
-  // Ensure columns exist
-  try { await d1.prepare("ALTER TABLE daily_snapshots ADD COLUMN rates TEXT").run(); } catch { /* exists */ }
+  if (!migrationsRun) {
+    try { await d1.prepare("ALTER TABLE daily_snapshots ADD COLUMN rates TEXT").run(); } catch { /* exists */ }
+    migrationsRun = true;
+  }
 
   // Load exchange rates once before account loop
   const allRates = await db.select().from(exchangeRates).all();

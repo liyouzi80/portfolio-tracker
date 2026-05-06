@@ -38,11 +38,15 @@ interface AccountSummary {
 
 interface ChartPoint { date: string; value: number; }
 
+let migrationsRun = false;
+
 export async function GET(req: NextRequest) {
   try {
   const { DB: d1 } = getPlatformEnv();
-  // Ensure tx_hash column exists (added in schema migration)
-  try { await d1.prepare("ALTER TABLE transactions ADD COLUMN tx_hash TEXT").run(); } catch { /* exists */ }
+  if (!migrationsRun) {
+    try { await d1.prepare("ALTER TABLE transactions ADD COLUMN tx_hash TEXT").run(); } catch { /* exists */ }
+    migrationsRun = true;
+  }
 
   const db = getDb(d1);
   const { searchParams } = new URL(req.url);
@@ -188,39 +192,41 @@ export async function GET(req: NextRequest) {
 
       // Fetch HK via Longbridge (primary), Tencent (fallback)
       const lbPrices = hkSymbols.length > 0 ? await fetchLongbridgePrices(hkSymbols) : new Map();
-      for (const [k, v] of lbPrices) priceCache.set(k.split(":")[1] + k.split(":")[0], { price: v.price, prevClose: v.prevClose });
+      for (const [k, v] of lbPrices) {
+        priceCache.set(k.split(":")[1] + k.split(":")[0], { price: v.price, prevClose: v.prevClose });
+        const [market, symbol] = k.split(":");
+        PRICE_CACHE.put(`price:${market}:${symbol}`, JSON.stringify({ symbol, market, price: v.price, prevClose: v.prevClose, name: v.name || symbol, updatedAt: Date.now() }), { expirationTtl: 86400 }).catch(() => {});
+      }
       const hkMissedByLB = hkSymbols.filter(s => !lbPrices.has(`${s.market}:${s.symbol}`));
       const tencentHK = hkMissedByLB.length > 0 ? await fetchTencentPrices(hkMissedByLB) : new Map();
-      for (const [k, v] of tencentHK) priceCache.set(k.split(":")[1] + k.split(":")[0], { price: v.price, prevClose: v.prevClose });
+      for (const [k, v] of tencentHK) {
+        priceCache.set(k.split(":")[1] + k.split(":")[0], { price: v.price, prevClose: v.prevClose });
+        const [market, symbol] = k.split(":");
+        PRICE_CACHE.put(`price:${market}:${symbol}`, JSON.stringify({ symbol, market, price: v.price, prevClose: v.prevClose, name: v.name || symbol, updatedAt: Date.now() }), { expirationTtl: 86400 }).catch(() => {});
+      }
 
       // Fetch CN/other via Tencent
       const tencentPrices = otherSymbols.length > 0 ? await fetchTencentPrices(otherSymbols) : new Map();
-      for (const [k, v] of tencentPrices) priceCache.set(k.split(":")[1] + k.split(":")[0], { price: v.price, prevClose: v.prevClose });
+      for (const [k, v] of tencentPrices) {
+        priceCache.set(k.split(":")[1] + k.split(":")[0], { price: v.price, prevClose: v.prevClose });
+        const [market, symbol] = k.split(":");
+        PRICE_CACHE.put(`price:${market}:${symbol}`, JSON.stringify({ symbol, market, price: v.price, prevClose: v.prevClose, name: v.name || symbol, updatedAt: Date.now() }), { expirationTtl: 86400 }).catch(() => {});
+      }
 
       // Fetch US via Finnhub (Tencent US endpoint blocks Workers, Finnhub is the only working US source)
       if (usSymbols.length > 0) {
         const fhResults = await Promise.all(usSymbols.map(async (s) => {
           const fh = await fetchFinnhubPrice(s.symbol, s.market);
-          return { key: `${s.symbol}${s.market}`, price: fh?.price ?? null };
+          return { s, price: fh?.price ?? null };
         }));
-        for (const { key, price } of fhResults) {
-          if (price) priceCache.set(key, { price });
+        for (const { s, price } of fhResults) {
+          if (price) {
+            priceCache.set(s.symbol + s.market, { price });
+            PRICE_CACHE.put(`price:${s.market}:${s.symbol}`, JSON.stringify({ symbol: s.symbol, market: s.market, price, updatedAt: Date.now() }), { expirationTtl: 86400 }).catch(() => {});
+          }
         }
       }
 
-      // Write fetched prices back to KV
-      await Promise.all(
-        Array.from(priceCache.entries()).map(async ([k, data]) => {
-          try {
-            // Find market for this key to build proper cache key
-            const h = holdings.find(h => h.symbol + h.market === k);
-            if (h && data.price) {
-              const cacheKey = `price:${h.market}:${h.symbol}`;
-              await PRICE_CACHE.put(cacheKey, JSON.stringify({ symbol: h.symbol, market: h.market, price: data.price, prevClose: data.prevClose, name: h.name, updatedAt: Date.now() }), { expirationTtl: 86400 });
-            }
-          } catch { /* ignore */ }
-        })
-      );
     }
 
     // Compute per-holding P&L (in holding currency and converted)

@@ -75,6 +75,8 @@ export function AppShell() {
 
   const handleLogout = useCallback(() => {
     if (!confirm("确认退出登录？")) return;
+    sessionStorage.removeItem("alerts-seeded");
+    lastTriggeredIds.current = new Set();
     fetch("/api/auth", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
