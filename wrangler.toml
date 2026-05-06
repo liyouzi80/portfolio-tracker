@@ -30,10 +30,3 @@ invocation_logs = true
 enabled = true
 persist = true
 head_sampling_rate = 1
-
-[triggers]
-crons = [
-  "*/30 * * * *",
-  "0 8 * * *",
-  "30 6 * * *",
-]
