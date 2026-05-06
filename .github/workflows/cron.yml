@@ -1,0 +1,44 @@
+name: Cron Jobs
+
+on:
+  schedule:
+    # Every 30 min: price fetch + alert check
+    - cron: "*/30 * * * *"
+    # Daily 08:00 UTC: snapshot
+    - cron: "0 8 * * *"
+    # Daily 06:30 UTC: exchange rates
+    - cron: "30 6 * * *"
+  workflow_dispatch:
+    inputs:
+      job:
+        description: 'Job to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - price-fetch
+          - snapshot
+          - rates-fetch
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Price Fetch
+        if: github.event_name == 'schedule' || github.event.inputs.job == 'all' || github.event.inputs.job == 'price-fetch'
+        run: |
+          echo "Running price-fetch..."
+          curl -sf "https://portfolio.muyiluling.com/api/cron/price-fetch?secret=${{ secrets.CRON_SECRET }}" || echo "Price-fetch failed (non-fatal)"
+
+      - name: Snapshot
+        if: github.event_name == 'schedule' || github.event.inputs.job == 'all' || github.event.inputs.job == 'snapshot'
+        run: |
+          echo "Running snapshot..."
+          curl -sf "https://portfolio.muyiluling.com/api/cron/snapshot?secret=${{ secrets.CRON_SECRET }}" || echo "Snapshot failed (non-fatal)"
+
+      - name: Rates Fetch
+        if: github.event_name == 'schedule' || github.event.inputs.job == 'all' || github.event.inputs.job == 'rates-fetch'
+        run: |
+          echo "Running rates-fetch..."
+          curl -sf "https://portfolio.muyiluling.com/api/cron/rates-fetch?secret=${{ secrets.CRON_SECRET }}" || echo "Rates-fetch failed (non-fatal)"

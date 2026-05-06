@@ -48,7 +48,7 @@ async function registerPasskey(): Promise<string> {
 }
 
 interface Account { id: string; name: string; currency: string; leverage: number }
-interface Alert { id: string; symbol: string; condition: string; threshold: number; enabled: boolean }
+interface Alert { id: string; symbol: string; condition: string; threshold: number; enabled: boolean; triggeredAt: string | null }
 
 export function SettingsTab() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -76,13 +76,14 @@ export function SettingsTab() {
         setAccounts(accData);
       }
       if (alertRes.ok) {
-        const alertData = await alertRes.json() as Array<{ id: string; symbol: string; conditionType: string; threshold: number; enabled: number }>;
+        const alertData = await alertRes.json() as Array<{ id: string; symbol: string; conditionType: string; threshold: number; enabled: number; triggeredAt: string | null }>;
         setAlerts(alertData.map((a) => ({
           id: a.id,
           symbol: a.symbol,
           condition: a.conditionType,
           threshold: a.threshold,
           enabled: a.enabled === 1,
+          triggeredAt: a.triggeredAt ?? null,
         })));
       }
       if (authRes.ok) {
@@ -151,7 +152,7 @@ export function SettingsTab() {
       });
       const data = await res.json() as { id?: string; error?: string };
       if (data.id) {
-        setAlerts([...alerts, { id: data.id, ...a, enabled: true }]);
+        setAlerts([...alerts, { id: data.id, ...a, enabled: true, triggeredAt: null }]);
         toast.success("提醒已创建");
       } else {
         toast.error(data.error || "创建失败");
@@ -168,20 +169,32 @@ export function SettingsTab() {
   };
 
   const handleToggleAlert = async (id: string) => {
-    const alert = alerts.find((a) => a.id === id);
-    if (!alert) return;
-    const newEnabled = !alert.enabled;
-    setAlerts(alerts.map((a) => a.id === id ? { ...a, enabled: newEnabled } : a));
+    const a = alerts.find((x) => x.id === id);
+    if (!a) return;
+    const newEnabled = !a.enabled;
+    setAlerts(alerts.map((x) => x.id === id ? { ...x, enabled: newEnabled } : x));
     try {
-      await fetch(`/api/alerts/${id}`, {
-        method: "PUT",
+      await fetch("/api/alerts", {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: newEnabled ? 1 : 0 }),
+        body: JSON.stringify({ id, action: "toggle", enabled: newEnabled }),
       });
     } catch {
-      setAlerts(alerts.map((a) => a.id === id ? { ...a, enabled: !newEnabled } : a));
+      setAlerts(alerts.map((x) => x.id === id ? { ...x, enabled: !newEnabled } : x));
       toast.error("更新失败");
     }
+  };
+
+  const handleResetAlert = async (id: string) => {
+    setAlerts(alerts.map((x) => x.id === id ? { ...x, triggeredAt: null, enabled: true } : x));
+    try {
+      await fetch("/api/alerts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action: "reset" }),
+      });
+      toast.success("提醒已重置");
+    } catch { toast.error("重置失败"); loadData(); }
   };
 
   const handleRegisterPasskey = async () => {
@@ -332,11 +345,19 @@ export function SettingsTab() {
                     <TableCell className="text-zinc-300">{a.condition === "price_below" ? "低于" : "高于"}</TableCell>
                     <TableCell className="font-mono">{a.threshold}</TableCell>
                     <TableCell>
-                      <button onClick={() => handleToggleAlert(a.id)}>
-                        <Badge variant="outline" className={a.enabled ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 cursor-pointer" : "bg-zinc-800 text-zinc-500 border-zinc-700 cursor-pointer"}>
-                          {a.enabled ? "启用" : "暂停"}
-                        </Badge>
-                      </button>
+                      {a.triggeredAt ? (
+                        <button onClick={() => handleResetAlert(a.id)} title={`触发于 ${new Date(a.triggeredAt).toLocaleString()}`}>
+                          <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/20 cursor-pointer hover:bg-amber-500/20">
+                            已触发
+                          </Badge>
+                        </button>
+                      ) : (
+                        <button onClick={() => handleToggleAlert(a.id)}>
+                          <Badge variant="outline" className={a.enabled ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 cursor-pointer" : "bg-zinc-800 text-zinc-500 border-zinc-700 cursor-pointer"}>
+                            {a.enabled ? "启用" : "暂停"}
+                          </Badge>
+                        </button>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-500 hover:text-red-400" onClick={() => handleDeleteAlert(a.id)}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardTab } from "./dashboard-tab";
 import { TransactionsTab } from "./transactions-tab";
@@ -34,6 +34,44 @@ export function AppShell() {
   }, [isDark]);
 
   const handleUnlock = useCallback(() => setUnlocked(true), []);
+
+  // Alert polling + browser notifications
+  const [pendingAlerts, setPendingAlerts] = useState(0);
+  const lastTriggeredIds = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!unlocked) return;
+    // Request notification permission
+    import("@/lib/notifications").then(({ ensureNotificationPermission }) => {
+      ensureNotificationPermission();
+    });
+
+    const checkAlerts = async () => {
+      try {
+        const r = await fetch("/api/alerts");
+        if (!r.ok) return;
+        const data = await r.json() as Array<{ id: string; symbol: string; conditionType: string; threshold: number; triggeredAt: string | null }>;
+        const triggered = data.filter(a => a.triggeredAt);
+        setPendingAlerts(triggered.length);
+
+        // Notify for newly triggered alerts (skip first load to avoid spam)
+        const seeded = sessionStorage.getItem("alerts-seeded");
+        if (seeded) {
+          const newOnes = triggered.filter(a => !lastTriggeredIds.current.has(a.id));
+          const { notifyAlert } = await import("@/lib/notifications");
+          for (const a of newOnes) {
+            notifyAlert(a.symbol, a.conditionType, a.threshold);
+          }
+        }
+        lastTriggeredIds.current = new Set(triggered.map(a => a.id));
+        sessionStorage.setItem("alerts-seeded", "1");
+      } catch { /* ignore */ }
+    };
+
+    checkAlerts();
+    const id = setInterval(checkAlerts, 60_000);
+    return () => clearInterval(id);
+  }, [unlocked]);
 
   const handleLogout = useCallback(() => {
     if (!confirm("确认退出登录？")) return;
@@ -82,8 +120,13 @@ export function AppShell() {
                 <TabsTrigger value="transactions" className="data-[state=active]:bg-zinc-800">
                   交易记录
                 </TabsTrigger>
-                <TabsTrigger value="settings" className="data-[state=active]:bg-zinc-800">
+                <TabsTrigger value="settings" className="data-[state=active]:bg-zinc-800 relative">
                   设置
+                  {pendingAlerts > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 bg-amber-500 text-black text-[10px] rounded-full h-4 min-w-4 px-1 font-mono font-bold leading-4 flex items-center justify-center">
+                      {pendingAlerts > 9 ? "9+" : pendingAlerts}
+                    </span>
+                  )}
                 </TabsTrigger>
               </TabsList>
               <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-500 hover:text-zinc-300" onClick={toggleTheme}>

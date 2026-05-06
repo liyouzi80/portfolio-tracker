@@ -13,6 +13,7 @@ export async function GET() {
     conditionType: alerts.conditionType,
     threshold: alerts.threshold,
     enabled: alerts.enabled,
+    triggeredAt: alerts.triggeredAt,
     symbol: assets.symbol,
     market: assets.market,
   }).from(alerts)
@@ -28,7 +29,6 @@ export async function POST(req: NextRequest) {
 
   let assetId = body.assetId;
   if (!assetId && body.symbol) {
-    // Auto-resolve or create asset by symbol
     const market = body.market ?? "US";
     const existing = await db.select().from(assets)
       .where(and(eq(assets.symbol, body.symbol.toUpperCase()), eq(assets.market, market)))
@@ -59,6 +59,20 @@ export async function POST(req: NextRequest) {
     enabled: 1,
   });
   return NextResponse.json({ id });
+}
+
+export async function PATCH(req: NextRequest) {
+  const db = getDb(getPlatformEnv().DB);
+  const body = await req.json() as { id: string; action: "reset" | "toggle"; enabled?: boolean };
+  if (body.action === "reset") {
+    await db.update(alerts).set({ enabled: 1, triggeredAt: null }).where(eq(alerts.id, body.id));
+    return NextResponse.json({ success: true });
+  }
+  if (body.action === "toggle") {
+    await db.update(alerts).set({ enabled: body.enabled ? 1 : 0 }).where(eq(alerts.id, body.id));
+    return NextResponse.json({ success: true });
+  }
+  return NextResponse.json({ error: "Unknown action" }, { status: 400 });
 }
 
 export async function DELETE(req: NextRequest) {
