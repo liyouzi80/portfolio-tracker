@@ -1,4 +1,4 @@
-# Portfolio Tracker
+# Portfolio Tracker（个人投资组合追踪）
 
 跨市场、多币种、自托管的个人投资组合追踪工具。**单 Worker 部署**，全部数据在你自己的 Cloudflare 账户里，零月费可运行。
 
