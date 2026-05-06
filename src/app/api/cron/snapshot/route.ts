@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db";
 import { transactions, assets, accounts, dailySnapshots, exchangeRates } from "@/db/schema";
 import { getPlatformEnv } from "@/lib/env";
-import { fetchTencentPrices, fetchLongbridgePrices } from "@/lib/price";
+import { fetchTencentPrices, fetchLongbridgePrices, fetchFinnhubPrice } from "@/lib/price";
 import { eq, and, desc } from "drizzle-orm";
 import { cuid } from "@/lib/cuid";
 
@@ -54,22 +54,51 @@ export async function GET(req: NextRequest) {
     const holdings = Array.from(holdingsMap.values());
     if (holdings.length === 0) continue;
 
-    // Fetch current prices — Longbridge for HK, Tencent for CN/US + HK fallback
-    const hkSymbols = holdings.filter(h => h.market === "HK").map(h => ({ symbol: h.symbol, market: h.market }));
-    const otherSymbols = holdings.filter(h => h.market !== "HK").map(h => ({ symbol: h.symbol, market: h.market }));
+    // Fetch prices: KV cache first, then live API by market
+    const { PRICE_CACHE } = getPlatformEnv();
+    const priceCache = new Map<string, { price: number }>();
+    const missing: Array<{ symbol: string; market: string }> = [];
 
-    const lbPrices = hkSymbols.length > 0 ? await fetchLongbridgePrices(hkSymbols) : new Map();
-    const hkMissed = hkSymbols.filter(s => !lbPrices.has(`${s.market}:${s.symbol}`));
-    const tencentHKFallback = hkMissed.length > 0 ? await fetchTencentPrices(hkMissed) : new Map();
-    const tencentPrices = otherSymbols.length > 0 ? await fetchTencentPrices(otherSymbols) : new Map();
+    for (const h of holdings) {
+      try {
+        const cached = await PRICE_CACHE.get(`price:${h.market}:${h.symbol}`, "json") as { price?: number } | null;
+        if (cached?.price) { priceCache.set(`${h.market}:${h.symbol}`, { price: cached.price }); }
+        else { missing.push({ symbol: h.symbol, market: h.market }); }
+      } catch { missing.push({ symbol: h.symbol, market: h.market }); }
+    }
 
-    const prices = new Map([...lbPrices, ...tencentHKFallback, ...tencentPrices]);
+    if (missing.length > 0) {
+      const hkSym = missing.filter(s => s.market === "HK");
+      const usSym = missing.filter(s => s.market === "US");
+      const cnSym = missing.filter(s => s.market === "CN");
+
+      // HK: Longbridge primary, Tencent fallback
+      const lbPrices = hkSym.length > 0 ? await fetchLongbridgePrices(hkSym) : new Map();
+      for (const [k, v] of lbPrices) priceCache.set(k, { price: v.price });
+      const hkMissed = hkSym.filter(s => !lbPrices.has(`${s.market}:${s.symbol}`));
+
+      // CN + HK fallback: Tencent
+      const tencentSym = [...cnSym, ...hkMissed];
+      const tcPrices = tencentSym.length > 0 ? await fetchTencentPrices(tencentSym) : new Map();
+      for (const [k, v] of tcPrices) priceCache.set(k, { price: v.price });
+
+      // US: Finnhub (Tencent US endpoint blocks Workers)
+      if (usSym.length > 0) {
+        const fhResults = await Promise.all(usSym.map(async (s) => {
+          const fh = await fetchFinnhubPrice(s.symbol, s.market);
+          return { key: `${s.market}:${s.symbol}`, price: fh?.price };
+        }));
+        for (const { key, price } of fhResults) {
+          if (price) priceCache.set(key, { price });
+        }
+      }
+    }
     let totalCost = 0;
     let totalMarketValue = 0;
 
     for (const h of holdings) {
-      const priceData = prices.get(`${h.market}:${h.symbol}`);
-      const currentPrice = priceData?.price ?? 0;
+      const p = priceCache.get(`${h.market}:${h.symbol}`);
+      const currentPrice = p?.price ?? 0;
       totalCost += h.totalCost;
       totalMarketValue += currentPrice * h.quantity;
     }
