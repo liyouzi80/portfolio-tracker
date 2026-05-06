@@ -105,7 +105,28 @@ const US_STOCK_CN_NAMES: Record<string, string> = {
   DRAM: "DRAM半导体ETF",
 };
 
+// Japanese stocks (Tokyo Stock Exchange)
+const JP_STOCK_CN_NAMES: Record<string, string> = {
+  "1570": "日经225杠杆ETF",
+  "1321": "日经225ETF",
+  "1306": "TOPIX ETF",
+  "7203": "丰田汽车",
+  "6758": "索尼集团",
+  "9984": "软银集团",
+  "8035": "东京电子",
+  "8306": "三菱UFJ金融",
+  "9432": "日本电信电话",
+  "6861": "基恩士",
+  "6098": "瑞可利",
+  "4568": "第一三共",
+  "4503": "安斯泰来制药",
+  "7267": "本田技研工业",
+  "7974": "任天堂",
+  "7733": "奥林巴斯",
+};
+
 export function getChineseName(symbol: string, market: string): string | null {
-  if (market !== "US") return null; // HK/CN handled by Tencent API
-  return US_STOCK_CN_NAMES[symbol.toUpperCase()] || null;
+  if (market === "US") return US_STOCK_CN_NAMES[symbol.toUpperCase()] || null;
+  if (market === "JP") return JP_STOCK_CN_NAMES[symbol] || null;
+  return null;
 }
