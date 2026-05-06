@@ -40,7 +40,11 @@ interface ChartPoint { date: string; value: number; }
 
 export async function GET(req: NextRequest) {
   try {
-  const db = getDb(getPlatformEnv().DB);
+  const { DB: d1 } = getPlatformEnv();
+  // Ensure tx_hash column exists (added in schema migration)
+  try { await d1.prepare("ALTER TABLE transactions ADD COLUMN tx_hash TEXT").run(); } catch { /* exists */ }
+
+  const db = getDb(d1);
   const { searchParams } = new URL(req.url);
   const baseCurrency = searchParams.get("baseCurrency") ?? "USD";
   const accountId = searchParams.get("accountId");
