@@ -5,6 +5,7 @@ import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 interface TickerItem {
   symbol: string;
+  name: string;
   price: number | null;
   change: number | null;
   changePct: number | null;
@@ -23,7 +24,7 @@ export function PriceTicker() {
         const r = await fetch(`/api/portfolio?baseCurrency=USD`);
         if (!r.ok) return;
         const d = await r.json() as {
-          holdings?: Array<{ symbol: string; currentPrice?: number; prevClose?: number }>;
+          holdings?: Array<{ symbol: string; name: string; currentPrice?: number; prevClose?: number }>;
         };
         if (cancelled) return;
 
@@ -37,7 +38,7 @@ export function PriceTicker() {
           const prev = h.prevClose;
           const change = (price !== null && prev && prev > 0) ? price - prev : null;
           const changePct = change !== null && prev ? (change / prev) * 100 : null;
-          list.push({ symbol: h.symbol, price, change, changePct });
+          list.push({ symbol: h.symbol, name: h.name || h.symbol, price, change, changePct });
         }
         // Fallback to SPY when there are no holdings yet
         if (list.length === 0) {
@@ -49,6 +50,7 @@ export function PriceTicker() {
             const change = (price !== null && prev && prev > 0) ? price - prev : null;
             list.push({
               symbol: "SPY",
+              name: "标普500ETF",
               price,
               change,
               changePct: change !== null && prev ? (change / prev) * 100 : null,
@@ -75,6 +77,7 @@ export function PriceTicker() {
       <div className="marquee-container flex whitespace-nowrap animate-[marquee_30s_linear_infinite] hover:[animation-play-state:paused]">
         {[...items, ...items].map((item, i) => (
           <div key={`${item.symbol}-${i}`} className="inline-flex items-center gap-2 px-4 py-2 text-sm">
+            <span className="text-zinc-400 text-xs">{item.name}</span>
             <span className="font-mono font-medium">{item.symbol}</span>
             <span className="text-zinc-300">
               {item.price !== null ? item.price.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "--"}

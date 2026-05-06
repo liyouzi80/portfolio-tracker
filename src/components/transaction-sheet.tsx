@@ -318,7 +318,7 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
               </div>
               <div className="space-y-2">
                 <Label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                  价格 ({priceLabel})
+                  价格
                 </Label>
                 <Input
                   value={form.price}

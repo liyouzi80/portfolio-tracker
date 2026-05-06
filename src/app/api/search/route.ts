@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getDb } from "@/db";
+import { assets } from "@/db/schema";
+import { getPlatformEnv } from "@/lib/env";
+import { like, or, eq } from "drizzle-orm";
 
 // Yahoo Finance v1 auto-complete (free, no API key)
 // Returns matching stocks globally with symbol, name, exchange, market, currency, price
@@ -28,21 +32,18 @@ const suffixMap: Record<string, { market: string; currency: string; label: strin
 };
 
 function parseSymbol(fullSymbol: string): { symbol: string; suffix: string; market: string; currency: string; label: string } {
-  // Try known suffixes
   for (const [suffix, info] of Object.entries(suffixMap)) {
     if (suffix && fullSymbol.toUpperCase().endsWith(suffix)) {
       const symbol = fullSymbol.slice(0, -suffix.length);
       return { symbol, suffix, ...info };
     }
   }
-  // No known suffix: check if it's a numeric A-share or HK code
   if (/^\d{6}$/.test(fullSymbol)) {
     return { symbol: fullSymbol, suffix: "", market: "CN", currency: "CNY", label: "A股" };
   }
   if (/^\d{4,5}$/.test(fullSymbol)) {
     return { symbol: fullSymbol, suffix: "", market: "HK", currency: "HKD", label: "港股" };
   }
-  // Default: US stock
   return { symbol: fullSymbol, suffix: "", market: "US", currency: "USD", label: "美股" };
 }
 
@@ -51,34 +52,66 @@ export async function GET(req: NextRequest) {
   const q = searchParams.get("q");
   if (!q || q.length < 1) return NextResponse.json([]);
 
+  const results: Array<{ symbol: string; fullSymbol: string; name: string; exchange: string; market: string; currency: string; marketLabel: string; price: number | null }> = [];
+
+  // 1. Search local assets table for Chinese/English name matches
+  try {
+    const { DB } = getPlatformEnv();
+    const db = getDb(DB);
+    const localMatches = await db.select().from(assets)
+      .where(or(
+        like(assets.symbol, `%${q}%`),
+        like(assets.name, `%${q}%`),
+      ))
+      .limit(8).all();
+    for (const a of localMatches) {
+      if (!results.find(r => r.symbol === a.symbol && r.market === a.market)) {
+        results.push({
+          symbol: a.symbol,
+          fullSymbol: a.symbol,
+          name: (a.name && a.name !== a.symbol) ? a.name : a.symbol,
+          exchange: a.market,
+          market: a.market,
+          currency: a.currency,
+          marketLabel: marketLabel(a.market),
+          price: null,
+        });
+      }
+    }
+  } catch { /* D1 may not be available */ }
+
+  // 2. Yahoo Finance search
   try {
     const res = await fetch(
       `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&lang=en&region=US&quotesCount=12`,
       { headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" } }
     );
-    if (!res.ok) return NextResponse.json([]);
-    const data = await res.json() as { quotes?: Array<{ symbol: string; shortname?: string; longname?: string; exchDisp?: string; typeDisp?: string; regularMarketPrice?: number }> };
-    const results = (data.quotes ?? [])
-      .filter(q => {
+    if (res.ok) {
+      const data = await res.json() as { quotes?: Array<{ symbol: string; shortname?: string; longname?: string; exchDisp?: string; typeDisp?: string; regularMarketPrice?: number }> };
+      for (const q of (data.quotes ?? [])) {
         const t = (q.typeDisp ?? "").toLowerCase();
-        return t === "equity" || t === "etf";
-      })
-      .slice(0, 10)
-      .map(q => {
+        if (t !== "equity" && t !== "etf") continue;
         const parsed = parseSymbol(q.symbol);
-        return {
-          symbol: parsed.symbol,
-          fullSymbol: q.symbol,
-          name: q.shortname || q.longname || q.symbol,
-          exchange: q.exchDisp || parsed.label,
-          market: parsed.market,
-          currency: parsed.currency,
-          marketLabel: parsed.label,
-          price: q.regularMarketPrice ?? null,
-        };
-      });
-    return NextResponse.json(results);
-  } catch {
-    return NextResponse.json([]);
-  }
+        if (!results.find(r => r.symbol === parsed.symbol && r.market === parsed.market)) {
+          results.push({
+            symbol: parsed.symbol,
+            fullSymbol: q.symbol,
+            name: q.shortname || q.longname || q.symbol,
+            exchange: q.exchDisp || parsed.label,
+            market: parsed.market,
+            currency: parsed.currency,
+            marketLabel: parsed.label,
+            price: q.regularMarketPrice ?? null,
+          });
+        }
+      }
+    }
+  } catch { /* ignore */ }
+
+  return NextResponse.json(results.slice(0, 10));
+}
+
+function marketLabel(m: string): string {
+  const labels: Record<string, string> = { US: "美股", HK: "港股", CN: "A股", JP: "日股", KR: "韩股" };
+  return labels[m] || m;
 }

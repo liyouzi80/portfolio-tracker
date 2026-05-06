@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db";
 import { alerts, assets } from "@/db/schema";
 import { getPlatformEnv } from "@/lib/env";
-import { fetchTencentPrice, fetchFinnhubPrice, fetchLongbridgePrice, fetchYahooPrice } from "@/lib/price";
+import { fetchTencentPrice, fetchFinnhubPrice, fetchLongbridgePrice, fetchYahooQuote } from "@/lib/price";
+import { getChineseName } from "@/lib/stock-names";
 import { eq } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
@@ -19,39 +20,58 @@ export async function GET(req: NextRequest) {
 
   for (const asset of allAssets) {
     let price: number | null = null;
+    let displayName: string | null = null;
     let source = "none";
 
-    // 1. Tencent Finance (free, multi-market)
+    // 1. Tencent Finance (free, multi-market, Chinese names)
     const tencent = await fetchTencentPrice(asset.symbol, asset.market);
-    if (tencent) { price = tencent.price; source = "tencent"; }
+    if (tencent) { price = tencent.price; displayName = tencent.name; source = "tencent"; }
 
     // 2. Longbridge
     if (price === null) {
       try {
         const lb = await fetchLongbridgePrice(asset.symbol, asset.market);
-        if (lb) { price = lb.price; source = "longbridge"; }
+        if (lb) { price = lb.price; displayName = lb.name; source = "longbridge"; }
       } catch { /* fallback */ }
     }
 
     // 3. Finnhub (US stocks only)
     if (price === null && asset.market === "US") {
       const fh = await fetchFinnhubPrice(asset.symbol, asset.market);
-      if (fh) { price = fh.price; source = "finnhub"; }
+      if (fh) { price = fh.price; displayName = fh.name; source = "finnhub"; }
     }
 
     // 4. Yahoo Finance
     if (price === null) {
-      try { price = await fetchYahooPrice(asset.symbol, asset.market); if (price !== null) source = "yahoo"; } catch { source = "error"; }
+      try {
+        const yq = await fetchYahooQuote(asset.symbol, asset.market);
+        if (yq) { price = yq.price; displayName = yq.name || null; source = "yahoo"; }
+      } catch { source = "error"; }
     }
 
     if (price !== null) {
+      // Prefer Chinese name from static mapping for US stocks
+      const cnName = getChineseName(asset.symbol, asset.market);
+
       const cacheKey = `price:${asset.market}:${asset.symbol}`;
+      const nameForCache = cnName || (displayName && displayName !== asset.symbol ? displayName : asset.symbol);
       await PRICE_CACHE.put(cacheKey, JSON.stringify({
         symbol: asset.symbol,
         market: asset.market,
+        name: nameForCache,
         price,
+        source,
         updatedAt: Date.now(),
       }), { expirationTtl: 300 });
+
+      const bestName = cnName || (displayName && displayName !== asset.symbol ? displayName : null);
+
+      // Store name in assets table if we have a better one
+      if (bestName && bestName !== asset.name) {
+        try {
+          await db.update(assets).set({ name: bestName }).where(eq(assets.id, asset.id));
+        } catch { /* non-critical */ }
+      }
 
       results.push({ symbol: asset.symbol, price, source });
 

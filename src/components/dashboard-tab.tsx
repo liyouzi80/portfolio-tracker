@@ -61,9 +61,9 @@ interface PortfolioData {
   rates: Record<string, number>;
 }
 
-const currencySymbols: Record<string, string> = { CNY: "¥", USD: "$", HKD: "HK$" };
-const marketLabels: Record<string, string> = { US: "美股", HK: "港股", CN: "A股" };
-const marketColors: Record<string, string> = { US: "#6366f1", HK: "#8b5cf6", CN: "#06b6d4" };
+const currencySymbols: Record<string, string> = { CNY: "¥", USD: "$", HKD: "HK$", JPY: "¥" };
+const marketLabels: Record<string, string> = { US: "美股", HK: "港股", CN: "A股", JP: "日股", KR: "韩股", GB: "英股", DE: "德股", CH: "瑞士", CA: "加股", AU: "澳股", TW: "台股", IN: "印度" };
+const marketColors: Record<string, string> = { US: "#3b82f6", HK: "#ef4444", CN: "#f59e0b", JP: "#ec4899", KR: "#8b5cf6", GB: "#06b6d4", DE: "#10b981", CH: "#f97316", CA: "#14b8a6", AU: "#6366f1", TW: "#84cc16", IN: "#d946ef" };
 
 const BASE_CURRENCY = "USD"; // single source of truth across the dashboard
 

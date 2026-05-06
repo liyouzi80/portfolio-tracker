@@ -242,8 +242,8 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
               <TableRow className="border-zinc-800 ">
                 <TableHead className="text-zinc-500">日期</TableHead>
                 <TableHead className="text-zinc-500">账户</TableHead>
-                <TableHead className="text-zinc-500">代码</TableHead>
                 <TableHead className="text-zinc-500">名称</TableHead>
+                <TableHead className="text-zinc-500">代码</TableHead>
                 <TableHead className="text-zinc-500">类型</TableHead>
                 <TableHead className="text-zinc-500 text-right">数量</TableHead>
                 <TableHead className="text-zinc-500 text-right">价格</TableHead>
@@ -257,8 +257,8 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
                 <TableRow key={t.id} className="border-zinc-800">
                   <TableCell className="text-zinc-300">{t.date}</TableCell>
                   <TableCell className="text-zinc-400 text-sm">{t.accountName}</TableCell>
-                  <TableCell className="font-mono font-medium">{t.symbol}</TableCell>
                   <TableCell className="text-zinc-400 text-sm max-w-[120px] truncate">{t.name || t.symbol}</TableCell>
+                  <TableCell className="font-mono font-medium">{t.symbol}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className={typeColors[t.type] ?? "border-zinc-700"}>
                       {typeLabels[t.type] ?? t.type}
