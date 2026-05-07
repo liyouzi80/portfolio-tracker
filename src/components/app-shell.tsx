@@ -38,7 +38,7 @@ function MarketDataStatus({ holdings, onRefresh, refreshing }: { holdings: Portf
     .filter(h => !isFresh(h))
     .map(h => h.symbol);
   const missingTitle = missingSymbols.length > 0
-    ? `未拿到价格：${missingSymbols.join("、")}`
+    ? `超过 35 分钟未更新：${missingSymbols.join("、")}`
     : undefined;
 
   return (
