@@ -7,7 +7,7 @@ function tencentSymbol(symbol: string, market: string): string {
     const first = symbol.charAt(0);
     return first === "6" ? `sh${symbol}` : `sz${symbol}`;
   }
-  if (market === "HK") return `hk${symbol}`;
+  if (market === "HK") return `hk${symbol.padStart(5, "0")}`;
   return symbol.toLowerCase(); // US
 }
 

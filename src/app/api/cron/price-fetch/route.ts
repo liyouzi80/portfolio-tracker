@@ -34,25 +34,37 @@ export async function GET(req: NextRequest) {
   const usAssets = allAssets.filter(a => a.market === "US");
   const otherAssets = allAssets.filter(a => !["CN", "HK", "US"].includes(a.market));
 
-  // 1. Tencent batch: CN + HK (one request for all)
-  const tencentTargets = [...cnAssets, ...hkAssets];
-  if (tencentTargets.length > 0) {
-    const tcResults = await fetchTencentPrices(tencentTargets.map(a => ({ symbol: a.symbol, market: a.market })));
-    for (const [key, v] of tcResults) {
-      priceMap.set(key, { price: v.price, prevClose: v.prevClose, name: v.name, source: "tencent" });
-    }
-  }
-
-  // 2. Longbridge: fallback for CN/HK missed by Tencent
-  const lbTargets = tencentTargets.filter(a => !priceMap.has(`${a.market}:${a.symbol}`));
-  if (lbTargets.length > 0) {
-    const lbResults = await fetchLongbridgePrices(lbTargets.map(a => ({ symbol: a.symbol, market: a.market })));
+  // 1. HK: Longbridge primary, Tencent fallback
+  if (hkAssets.length > 0) {
+    const lbResults = await fetchLongbridgePrices(hkAssets.map(a => ({ symbol: a.symbol, market: a.market })));
     for (const [key, v] of lbResults) {
       priceMap.set(key, { price: v.price, prevClose: v.prevClose, name: v.name, source: "longbridge" });
     }
+    const hkMissedByLB = hkAssets.filter(a => !priceMap.has(`${a.market}:${a.symbol}`));
+    if (hkMissedByLB.length > 0) {
+      const tcResults = await fetchTencentPrices(hkMissedByLB.map(a => ({ symbol: a.symbol, market: a.market })));
+      for (const [key, v] of tcResults) {
+        priceMap.set(key, { price: v.price, prevClose: v.prevClose, name: v.name, source: "tencent" });
+      }
+    }
   }
 
-  // 3. Finnhub: US (parallel, per-asset)
+  // 2. CN: Tencent primary, Longbridge fallback
+  if (cnAssets.length > 0) {
+    const tcResults = await fetchTencentPrices(cnAssets.map(a => ({ symbol: a.symbol, market: a.market })));
+    for (const [key, v] of tcResults) {
+      priceMap.set(key, { price: v.price, prevClose: v.prevClose, name: v.name, source: "tencent" });
+    }
+    const cnMissedByTC = cnAssets.filter(a => !priceMap.has(`${a.market}:${a.symbol}`));
+    if (cnMissedByTC.length > 0) {
+      const lbResults = await fetchLongbridgePrices(cnMissedByTC.map(a => ({ symbol: a.symbol, market: a.market })));
+      for (const [key, v] of lbResults) {
+        priceMap.set(key, { price: v.price, prevClose: v.prevClose, name: v.name, source: "longbridge" });
+      }
+    }
+  }
+
+  // 3. Finnhub: US primary, Longbridge fallback
   if (usAssets.length > 0) {
     const fhResults = await Promise.all(usAssets.map(async (a) => {
       const fh = await fetchFinnhubPrice(a.symbol, a.market);
@@ -61,6 +73,13 @@ export async function GET(req: NextRequest) {
     for (const { asset, price, prevClose, name, source } of fhResults) {
       if (price) {
         priceMap.set(`${asset.market}:${asset.symbol}`, { price, prevClose, name: name || asset.symbol, source });
+      }
+    }
+    const usMissedByFH = usAssets.filter(a => !priceMap.has(`${a.market}:${a.symbol}`));
+    if (usMissedByFH.length > 0) {
+      const lbResults = await fetchLongbridgePrices(usMissedByFH.map(a => ({ symbol: a.symbol, market: a.market })));
+      for (const [key, v] of lbResults) {
+        priceMap.set(key, { price: v.price, prevClose: v.prevClose, name: v.name, source: "longbridge" });
       }
     }
   }
