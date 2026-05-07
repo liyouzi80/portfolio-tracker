@@ -31,7 +31,17 @@ jobs:
           || (github.event_name == 'schedule' && github.event.schedule == '*/30 * * * *')
         run: |
           echo "Running price-fetch..."
-          curl -sf "https://${{ secrets.WORKER_HOST }}/api/cron/price-fetch?secret=${{ secrets.CRON_SECRET }}" || echo "Price-fetch failed (non-fatal)"
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" "https://${{ secrets.WORKER_HOST }}/api/cron/price-fetch?secret=${{ secrets.CRON_SECRET }}")
+          HTTP_STATUS=$(echo "$RESPONSE" | grep -oP 'HTTP_STATUS:\K\d+')
+          BODY=$(echo "$RESPONSE" | sed '/HTTP_STATUS:/d')
+          echo "HTTP Status: $HTTP_STATUS"
+          echo "Response Body:"
+          echo "$BODY" | head -50
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "❌ Price-fetch failed with HTTP $HTTP_STATUS"
+            exit 1
+          fi
+          echo "✅ Price-fetch completed"
 
       - name: Snapshot
         if: |
@@ -39,7 +49,17 @@ jobs:
           || (github.event_name == 'schedule' && github.event.schedule == '0 8 * * *')
         run: |
           echo "Running snapshot..."
-          curl -sf "https://${{ secrets.WORKER_HOST }}/api/cron/snapshot?secret=${{ secrets.CRON_SECRET }}" || echo "Snapshot failed (non-fatal)"
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" "https://${{ secrets.WORKER_HOST }}/api/cron/snapshot?secret=${{ secrets.CRON_SECRET }}")
+          HTTP_STATUS=$(echo "$RESPONSE" | grep -oP 'HTTP_STATUS:\K\d+')
+          BODY=$(echo "$RESPONSE" | sed '/HTTP_STATUS:/d')
+          echo "HTTP Status: $HTTP_STATUS"
+          echo "Response Body:"
+          echo "$BODY" | head -50
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "❌ Snapshot failed with HTTP $HTTP_STATUS"
+            exit 1
+          fi
+          echo "✅ Snapshot completed"
 
       - name: Rates Fetch
         if: |
@@ -47,4 +67,14 @@ jobs:
           || (github.event_name == 'schedule' && github.event.schedule == '30 6 * * *')
         run: |
           echo "Running rates-fetch..."
-          curl -sf "https://${{ secrets.WORKER_HOST }}/api/cron/rates-fetch?secret=${{ secrets.CRON_SECRET }}" || echo "Rates-fetch failed (non-fatal)"
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" "https://${{ secrets.WORKER_HOST }}/api/cron/rates-fetch?secret=${{ secrets.CRON_SECRET }}")
+          HTTP_STATUS=$(echo "$RESPONSE" | grep -oP 'HTTP_STATUS:\K\d+')
+          BODY=$(echo "$RESPONSE" | sed '/HTTP_STATUS:/d')
+          echo "HTTP Status: $HTTP_STATUS"
+          echo "Response Body:"
+          echo "$BODY" | head -50
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "❌ Rates-fetch failed with HTTP $HTTP_STATUS"
+            exit 1
+          fi
+          echo "✅ Rates-fetch completed"

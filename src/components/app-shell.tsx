@@ -25,6 +25,13 @@ function MarketDataStatus({ holdings, onRefresh, refreshing }: { holdings: Portf
     .filter((t): t is number => typeof t === "number" && t > 0);
   const latestUpdate = validTimestamps.length > 0 ? Math.max(...validTimestamps) : null;
 
+  const minutesAgo = latestUpdate !== null ? Math.floor((Date.now() - latestUpdate) / 60000) : null;
+  const timeColor = minutesAgo === null
+    ? "text-zinc-300"
+    : minutesAgo > 240 ? "text-red-400"
+    : minutesAgo > 60 ? "text-amber-400"
+    : "text-zinc-300";
+
   const missingSymbols = holdings
     .filter(h => h.currentPrice === undefined || h.currentPrice <= 0)
     .map(h => h.symbol);
@@ -36,7 +43,10 @@ function MarketDataStatus({ holdings, onRefresh, refreshing }: { holdings: Portf
     <div className="hidden md:flex items-center gap-1.5 text-xs text-zinc-500">
       {latestUpdate !== null && (
         <>
-          <span className="font-mono tabular-nums">
+          <span
+            className={`font-mono tabular-nums ${timeColor}`}
+            title={minutesAgo !== null ? `${minutesAgo} 分钟前更新` : undefined}
+          >
             {new Date(latestUpdate).toLocaleString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })}
           </span>
           <span className="text-zinc-500">·</span>
@@ -145,7 +155,8 @@ export function AppShell() {
       const res = await fetch("/api/refresh", { method: "POST" });
       const data = await res.json() as { success?: boolean; updated?: number; retryAfter?: number; error?: string };
       if (data.success) {
-        toast.success(`行情已刷新，更新 ${data.updated ?? 0} 个标的`);
+        toast.success(`行情已刷新（${data.updated ?? 0} 个标的），数据同步到全球节点约需 30-60 秒`);
+        setTimeout(() => reloadSummary(), 30_000);
         reloadSummary();
       } else if (data.retryAfter) {
         toast.error(`${data.error || "请稍候"}（${data.retryAfter}秒后可重试）`);
