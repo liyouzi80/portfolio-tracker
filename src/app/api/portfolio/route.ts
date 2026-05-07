@@ -3,6 +3,7 @@ import { getDb } from "@/db";
 import { transactions, assets, accounts, exchangeRates, dailySnapshots } from "@/db/schema";
 import { getPlatformEnv } from "@/lib/env";
 import { eq, and, desc, asc } from "drizzle-orm";
+import { fetchTencentPrices, fetchLongbridgePrices, fetchFinnhubPrice, fetchYahooQuote } from "@/lib/price";
 
 interface Holding {
   assetId: string;
@@ -200,8 +201,6 @@ export async function GET(req: NextRequest) {
       // Markets Tencent can't handle: use Yahoo
       const yahooMarkets = new Set(["JP", "KR", "GB", "DE", "FR", "NL", "ES", "IT", "CH", "CA", "AU", "TW", "IN"]);
       const yahooSymbols = missingPrices.filter(p => yahooMarkets.has(p.market));
-
-      const { fetchTencentPrices, fetchLongbridgePrices, fetchFinnhubPrice, fetchYahooQuote } = await import("@/lib/price");
 
       // HK: Longbridge primary, Tencent fallback
       const lbPrices = hkSymbols.length > 0 ? await fetchLongbridgePrices(hkSymbols) : new Map();
@@ -419,13 +418,10 @@ export async function GET(req: NextRequest) {
       trackMap.set(k, t);
     }
 
-    const earliestDate = allTxns[0].transactions.date;
+    const sortedDates = Array.from(dateDelta.keys()).sort();
     let running = 0;
-    const start = new Date(earliestDate);
-    const end = new Date();
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const ds = d.toISOString().slice(0, 10);
-      if (dateDelta.has(ds)) running += dateDelta.get(ds)!;
+    for (const ds of sortedDates) {
+      running += dateDelta.get(ds)!;
       costSeries.push({ date: ds, value: Math.round(running * 100) / 100 });
     }
   }

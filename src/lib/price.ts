@@ -189,11 +189,21 @@ async function sha1(data: string): Promise<string> {
   return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function hmacSha256(data: string, key: string): Promise<string> {
+let _hmacKey: { secret: string; cryptoKey: CryptoKey } | null = null;
+
+async function getHmacKey(secret: string): Promise<CryptoKey> {
+  if (_hmacKey && _hmacKey.secret === secret) return _hmacKey.cryptoKey;
   const enc = new TextEncoder();
   const cryptoKey = await crypto.subtle.importKey(
-    "raw", enc.encode(key), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+    "raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
   );
+  _hmacKey = { secret, cryptoKey };
+  return cryptoKey;
+}
+
+async function hmacSha256(data: string, key: string): Promise<string> {
+  const enc = new TextEncoder();
+  const cryptoKey = await getHmacKey(key);
   const sig = await crypto.subtle.sign("HMAC", cryptoKey, enc.encode(data));
   return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }

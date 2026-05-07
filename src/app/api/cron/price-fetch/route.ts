@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db";
 import { alerts, assets } from "@/db/schema";
 import { getPlatformEnv } from "@/lib/env";
-import { fetchTencentPrice, fetchFinnhubPrice, fetchLongbridgePrice, fetchYahooQuote } from "@/lib/price";
+import { fetchTencentPrices, fetchLongbridgePrices, fetchFinnhubPrice, fetchYahooQuote } from "@/lib/price";
 import { getChineseName } from "@/lib/stock-names";
 import { eq } from "drizzle-orm";
 
@@ -25,91 +25,111 @@ export async function GET(req: NextRequest) {
     migrationsRun = true;
   }
 
-  const pendingWrites: Promise<unknown>[] = [];
-
-  // Process in batches of 5 to respect Finnhub rate limits (60 req/min).
-  const BATCH = 5;
+  const priceMap = new Map<string, { price: number; prevClose?: number; name: string; source: string }>();
   const results: { symbol: string; market: string; price: number | null; source: string }[] = [];
 
-  for (let i = 0; i < allAssets.length; i += BATCH) {
-    const batch = allAssets.slice(i, i + BATCH);
-    const batchResults = await Promise.all(batch.map(async (asset) => {
-      let price: number | null = null;
-      let prevClose: number | undefined;
-      let displayName: string | null = null;
-      let source = "none";
+  // Split assets by market for optimal source routing
+  const cnAssets = allAssets.filter(a => a.market === "CN");
+  const hkAssets = allAssets.filter(a => a.market === "HK");
+  const usAssets = allAssets.filter(a => a.market === "US");
+  const otherAssets = allAssets.filter(a => !["CN", "HK", "US"].includes(a.market));
 
-      const tencent = await fetchTencentPrice(asset.symbol, asset.market);
-      if (tencent) { price = tencent.price; prevClose = tencent.prevClose; displayName = tencent.name; source = "tencent"; }
-
-      if (price === null) {
-        try {
-          const lb = await fetchLongbridgePrice(asset.symbol, asset.market);
-          if (lb) { price = lb.price; prevClose = lb.prevClose; displayName = lb.name; source = "longbridge"; }
-        } catch { /* fallback */ }
-      }
-
-      if (price === null && asset.market === "US") {
-        const fh = await fetchFinnhubPrice(asset.symbol, asset.market);
-        if (fh) { price = fh.price; prevClose = fh.prevClose; displayName = fh.name; source = "finnhub"; }
-      }
-
-      if (price === null) {
-        try {
-          const yq = await fetchYahooQuote(asset.symbol, asset.market);
-          if (yq) { price = yq.price; prevClose = yq.prevClose; displayName = yq.name || null; source = "yahoo"; }
-        } catch { source = "error"; }
-      }
-
-      return { asset, price, prevClose, displayName, source };
-    }));
-
-    for (const { asset, price, prevClose, displayName, source } of batchResults) {
-      if (price === null) {
-        results.push({ symbol: asset.symbol, market: asset.market, price: null, source });
-        continue;
-      }
-
-      const cnName = getChineseName(asset.symbol, asset.market);
-      const nameForCache = cnName || (displayName && displayName !== asset.symbol ? displayName : asset.symbol);
-
-      pendingWrites.push(
-        PRICE_CACHE.put(`price:${asset.market}:${asset.symbol}`, JSON.stringify({
-          symbol: asset.symbol, market: asset.market, name: nameForCache, price, prevClose, source, updatedAt: Date.now(),
-        }), { expirationTtl: 86400 }).catch(() => {})
-      );
-
-      const bestName = cnName || (displayName && displayName !== asset.symbol ? displayName : null);
-      if (bestName && bestName !== asset.name) {
-        pendingWrites.push(
-          d1.prepare("UPDATE assets SET name = ?, last_price = ?, last_price_updated_at = ? WHERE id = ?")
-            .bind(bestName, price, new Date().toISOString(), asset.id).run().catch(() => {})
-        );
-      } else {
-        pendingWrites.push(
-          d1.prepare("UPDATE assets SET last_price = ?, last_price_updated_at = ? WHERE id = ?")
-            .bind(price, new Date().toISOString(), asset.id).run().catch(() => {})
-        );
-      }
-
-      results.push({ symbol: asset.symbol, market: asset.market, price, source });
-
-      // Check alerts
-      try {
-        const assetAlerts = await db.select().from(alerts).where(eq(alerts.assetId, asset.id)).all();
-        for (const alert of assetAlerts) {
-          if (!alert.enabled) continue;
-          let triggered = false;
-          if (alert.conditionType === "price_above" && price > alert.threshold) triggered = true;
-          if (alert.conditionType === "price_below" && price < alert.threshold) triggered = true;
-          if (triggered) {
-            pendingWrites.push(
-              db.update(alerts).set({ triggeredAt: new Date().toISOString(), enabled: 0 }).where(eq(alerts.id, alert.id)).run().catch(() => {})
-            );
-          }
-        }
-      } catch { /* alert check non-critical */ }
+  // 1. Tencent batch: CN + HK (one request for all)
+  const tencentTargets = [...cnAssets, ...hkAssets];
+  if (tencentTargets.length > 0) {
+    const tcResults = await fetchTencentPrices(tencentTargets.map(a => ({ symbol: a.symbol, market: a.market })));
+    for (const [key, v] of tcResults) {
+      priceMap.set(key, { price: v.price, prevClose: v.prevClose, name: v.name, source: "tencent" });
     }
+  }
+
+  // 2. Longbridge: fallback for CN/HK missed by Tencent
+  const lbTargets = tencentTargets.filter(a => !priceMap.has(`${a.market}:${a.symbol}`));
+  if (lbTargets.length > 0) {
+    const lbResults = await fetchLongbridgePrices(lbTargets.map(a => ({ symbol: a.symbol, market: a.market })));
+    for (const [key, v] of lbResults) {
+      priceMap.set(key, { price: v.price, prevClose: v.prevClose, name: v.name, source: "longbridge" });
+    }
+  }
+
+  // 3. Finnhub: US (parallel, per-asset)
+  if (usAssets.length > 0) {
+    const fhResults = await Promise.all(usAssets.map(async (a) => {
+      const fh = await fetchFinnhubPrice(a.symbol, a.market);
+      return { asset: a, price: fh?.price ?? null, prevClose: fh?.prevClose, name: fh?.name, source: fh ? "finnhub" : "none" };
+    }));
+    for (const { asset, price, prevClose, name, source } of fhResults) {
+      if (price) {
+        priceMap.set(`${asset.market}:${asset.symbol}`, { price, prevClose, name: name || asset.symbol, source });
+      }
+    }
+  }
+
+  // 4. Yahoo: fallback for anything still missing
+  const allMissed = allAssets.filter(a => !priceMap.has(`${a.market}:${a.symbol}`));
+  if (allMissed.length > 0) {
+    const yqResults = await Promise.all(allMissed.map(async (a) => {
+      try {
+        const yq = await fetchYahooQuote(a.symbol, a.market);
+        return { asset: a, price: yq?.price ?? null, prevClose: yq?.prevClose, name: yq?.name, source: yq ? "yahoo" : "none" };
+      } catch { return { asset: a, price: null, prevClose: undefined, name: undefined, source: "error" }; }
+    }));
+    for (const { asset, price, prevClose, name, source } of yqResults) {
+      if (price) {
+        priceMap.set(`${asset.market}:${asset.symbol}`, { price, prevClose, name: name || asset.symbol, source });
+      }
+    }
+  }
+
+  const pendingWrites: Promise<unknown>[] = [];
+
+  for (const asset of allAssets) {
+    const priceData = priceMap.get(`${asset.market}:${asset.symbol}`);
+    if (!priceData) {
+      results.push({ symbol: asset.symbol, market: asset.market, price: null, source: "none" });
+      continue;
+    }
+
+    const { price, prevClose, name: displayName, source } = priceData;
+    const cnName = getChineseName(asset.symbol, asset.market);
+    const nameForCache = cnName || (displayName && displayName !== asset.symbol ? displayName : asset.symbol);
+
+    pendingWrites.push(
+      PRICE_CACHE.put(`price:${asset.market}:${asset.symbol}`, JSON.stringify({
+        symbol: asset.symbol, market: asset.market, name: nameForCache, price, prevClose, source, updatedAt: Date.now(),
+      }), { expirationTtl: 86400 }).catch(() => {})
+    );
+
+    const bestName = cnName || (displayName && displayName !== asset.symbol ? displayName : null);
+    if (bestName && bestName !== asset.name) {
+      pendingWrites.push(
+        d1.prepare("UPDATE assets SET name = ?, last_price = ?, last_price_updated_at = ? WHERE id = ?")
+          .bind(bestName, price, new Date().toISOString(), asset.id).run().catch(() => {})
+      );
+    } else {
+      pendingWrites.push(
+        d1.prepare("UPDATE assets SET last_price = ?, last_price_updated_at = ? WHERE id = ?")
+          .bind(price, new Date().toISOString(), asset.id).run().catch(() => {})
+      );
+    }
+
+    results.push({ symbol: asset.symbol, market: asset.market, price, source });
+
+    // Check alerts
+    try {
+      const assetAlerts = await db.select().from(alerts).where(eq(alerts.assetId, asset.id)).all();
+      for (const alert of assetAlerts) {
+        if (!alert.enabled) continue;
+        let triggered = false;
+        if (alert.conditionType === "price_above" && price > alert.threshold) triggered = true;
+        if (alert.conditionType === "price_below" && price < alert.threshold) triggered = true;
+        if (triggered) {
+          pendingWrites.push(
+            db.update(alerts).set({ triggeredAt: new Date().toISOString(), enabled: 0 }).where(eq(alerts.id, alert.id)).run().catch(() => {})
+          );
+        }
+      }
+    } catch { /* alert check non-critical */ }
   }
 
   await Promise.all(pendingWrites);

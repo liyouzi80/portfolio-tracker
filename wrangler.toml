@@ -2,6 +2,7 @@ name = "portfolio-tracker"
 main = "cron-wrapper.js"
 compatibility_date = "2025-05-05"
 compatibility_flags = ["nodejs_compat"]
+usage_model = "bundled"
 
 [[d1_databases]]
 binding = "DB"
