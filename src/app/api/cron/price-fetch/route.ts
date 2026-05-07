@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
 
   // Process in batches of 5 to respect Finnhub rate limits (60 req/min).
   const BATCH = 5;
-  const results: { symbol: string; price: number | null; source: string }[] = [];
+  const results: { symbol: string; market: string; price: number | null; source: string }[] = [];
 
   for (let i = 0; i < allAssets.length; i += BATCH) {
     const batch = allAssets.slice(i, i + BATCH);
@@ -65,7 +65,10 @@ export async function GET(req: NextRequest) {
     }));
 
     for (const { asset, price, prevClose, displayName, source } of batchResults) {
-      if (price === null) continue;
+      if (price === null) {
+        results.push({ symbol: asset.symbol, market: asset.market, price: null, source });
+        continue;
+      }
 
       const cnName = getChineseName(asset.symbol, asset.market);
       const nameForCache = cnName || (displayName && displayName !== asset.symbol ? displayName : asset.symbol);
@@ -89,7 +92,7 @@ export async function GET(req: NextRequest) {
         );
       }
 
-      results.push({ symbol: asset.symbol, price, source });
+      results.push({ symbol: asset.symbol, market: asset.market, price, source });
 
       // Check alerts
       try {
@@ -110,5 +113,5 @@ export async function GET(req: NextRequest) {
   }
 
   await Promise.all(pendingWrites);
-  return NextResponse.json({ updated: results.length, results });
+  return NextResponse.json({ updated: results.filter(r => r.price !== null).length, total: results.length, results });
 }

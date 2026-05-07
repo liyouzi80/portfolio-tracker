@@ -18,7 +18,9 @@ function MarketDataStatus({ holdings, onRefresh, refreshing }: { holdings: Portf
   if (holdings.length === 0) return null;
 
   const total = holdings.length;
-  const fresh = holdings.filter(h => h.currentPrice !== undefined && h.currentPrice > 0).length;
+  const FRESH_MS = 35 * 60 * 1000;
+  const isFresh = (h: PortfolioSummaryHolding) => typeof h.priceUpdatedAt === "number" && h.priceUpdatedAt > 0 && Date.now() - h.priceUpdatedAt < FRESH_MS;
+  const fresh = holdings.filter(isFresh).length;
 
   const validTimestamps = holdings
     .map(h => h.priceUpdatedAt)
@@ -33,7 +35,7 @@ function MarketDataStatus({ holdings, onRefresh, refreshing }: { holdings: Portf
     : "text-zinc-300";
 
   const missingSymbols = holdings
-    .filter(h => h.currentPrice === undefined || h.currentPrice <= 0)
+    .filter(h => !isFresh(h))
     .map(h => h.symbol);
   const missingTitle = missingSymbols.length > 0
     ? `未拿到价格：${missingSymbols.join("、")}`
@@ -43,6 +45,7 @@ function MarketDataStatus({ holdings, onRefresh, refreshing }: { holdings: Portf
     <div className="hidden md:flex items-center gap-1.5 text-xs text-zinc-500">
       {latestUpdate !== null && (
         <>
+          <span className="text-zinc-500">行情时间</span>
           <span
             className={`font-mono tabular-nums ${timeColor}`}
             title={minutesAgo !== null ? `${minutesAgo} 分钟前更新` : undefined}
@@ -50,6 +53,7 @@ function MarketDataStatus({ holdings, onRefresh, refreshing }: { holdings: Portf
             {new Date(latestUpdate).toLocaleString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })}
           </span>
           <span className="text-zinc-500">·</span>
+          <span className="text-zinc-500">更新持仓</span>
           <span
             className={`font-mono tabular-nums ${fresh < total ? "text-amber-400 cursor-help" : "text-zinc-300"}`}
             title={missingTitle}
