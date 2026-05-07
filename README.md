@@ -21,7 +21,7 @@
 不是基于"累计买入金额"的伪净值——是基于每日真实 mark-to-market 的 daily snapshot。前端用 TradingView Lightweight Charts 渲染。
 
 **价格提醒**
-设阈值，cron 每 30 分钟检查一次，触发后浏览器弹通知。前端 settings 区显示已触发态，未读数量在 tab 上显示橙色徽标。
+设阈值，cron 每 30 分钟检查一次（Cloudflare Workers Cron Triggers 内部触发），触发后浏览器弹通知。前端 settings 区显示已触发态，未读数量在 tab 上显示橙色徽标。
 
 **导入与备份**
 CSV / Excel 批量导入交易记录，支持中英文表头、自动识别 A 股代码和港股代码、按 (symbol + market) 唯一去重。一键导出全部数据成 CSV 备份（含交易、账户、资产、快照、汇率、提醒）。
@@ -51,7 +51,7 @@ CSV / Excel 批量导入交易记录，支持中英文表头、自动识别 A �
 | 图表 | TradingView Lightweight Charts |
 | 认证 | WebAuthn PRF + PBKDF2-SHA256 + JWT (jose) |
 | 行情源 | 腾讯财经 / 长桥 OpenAPI / Finnhub / Yahoo Finance |
-| 调度 | GitHub Actions cron（每 30 分钟抓价 / 每天拍 snapshot / 每天更新汇率） |
+| 调度 | Cloudflare Workers Cron Triggers（内部触发，不经过 CDN）+ GitHub Actions workflow_dispatch（手动临时跑） |
 | CI/CD | GitHub Actions（push master → 自动部署 Worker） |
 
 ---
@@ -137,13 +137,17 @@ git push origin master
 
 刚部署时 KV 缓存、汇率表、daily snapshot 表都是空的。手动跑一次 cron workflow：
 
-仓库 → Actions → Cron Jobs → Run workflow → job 选 `all` → Run。
+仓库 → Actions → Cron Jobs (Manual Only) → Run workflow → job 选 `all` → Run。
 
-之后会按以下时间表自动跑：
+> **注意**：手动 workflow 走公网 CDN curl，可能被 Cloudflare Bot Fight Mode 拦（403）。如果失败，等下一轮 Workers Cron Triggers 自动执行即可，无需手动干预。
+
+之后 Workers Cron Triggers 会按以下时间表自动在 Cloudflare 内部触发（不经过公网 CDN，无 403 问题）：
 
 - **每 30 分钟**：抓价格 + 检查所有提醒
 - **每天 06:30 UTC**：更新 12 种货币的两两汇率
 - **每天 08:00 UTC**：拍 daily snapshot（净值曲线和盈亏走势的数据来源）
+
+配置在 `wrangler.toml` 的 `[triggers]` 段，由 `cron-wrapper.js` 接收 `scheduled` 事件后走 `ctx.waitUntil` 内部路由到对应 API。
 
 ---
 
@@ -202,14 +206,14 @@ npx wrangler dev   # 含 D1/KV 的完整本地环境（更接近生产）
 
 **API 鉴权**
 - 全部 `/api/*` 路径走 middleware 鉴权（除 `/api/auth`、`/api/bg`、`/api/cron`）
-- `/api/cron` 走 `?secret=` query string 鉴权（CRON_SECRET）
+- `/api/cron` 走 `?secret=` query string 鉴权（CRON_SECRET），由 Workers Cron Triggers 在内部网络触发
 
 ---
 
 ## 常见问题
 
 **部署后日股 / 韩股 / 欧股价格不显示**
-等下一次 cron `price-fetch` 跑完（每 30 分钟一次），KV 缓存会被填充。或手动 Run workflow → price-fetch。
+等下一次 Workers Cron Trigger 跑完 `price-fetch`（每 30 分钟一次），KV 缓存会被填充。或去 Cloudflare Dashboard → Workers → portfolio-tracker → Logs 确认 cron 是否已触发。
 
 **净值曲线 / 盈亏走势是空白的**
 需要至少一天的 daily snapshot 数据。第一次部署后手动 Run workflow → snapshot 立即拍一次，之后每天 08:00 UTC 自动累积。
@@ -230,6 +234,7 @@ npx wrangler dev   # 含 D1/KV 的完整本地环境（更接近生产）
 ## 项目结构
 
 ```
+cron-wrapper.js             # Workers Cron Trigger 入口，封装 OpenNext worker
 src/
 ├── app/
 │   ├── api/
