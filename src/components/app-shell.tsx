@@ -55,8 +55,13 @@ function MarketDataStatus({ holdings, onRefresh, refreshing }: { holdings: Portf
           <span className="text-zinc-500">·</span>
           <span className="text-zinc-500">更新持仓</span>
           <span
-            className={`font-mono tabular-nums ${fresh < total ? "text-amber-400 cursor-help" : "text-zinc-300"}`}
+            className={`font-mono tabular-nums ${fresh < total ? "text-amber-400 cursor-pointer" : "text-zinc-300"}`}
             title={missingTitle}
+            onClick={() => {
+              if (missingSymbols.length > 0) {
+                toast.error(`超过 35 分钟未更新：${missingSymbols.join("、")}`);
+              }
+            }}
           >
             {fresh}/{total}
           </span>
