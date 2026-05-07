@@ -138,6 +138,11 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    if (totalMarketValue === 0 && holdings.length > 0) {
+      console.log(`[snapshot] skipping ${acc.name}: no valid prices fetched`);
+      continue;
+    }
+
     // Delete incomplete snapshot if exists, then insert
     if (existingForAcc.length > 0) {
       await db.delete(dailySnapshots)

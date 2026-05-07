@@ -26,19 +26,21 @@ export default {
       return;
     }
 
-    const url = `http://localhost${path}?secret=${encodeURIComponent(secret)}`;
+    const url = `https://internal.cron${path}?secret=${encodeURIComponent(secret)}`;
     console.log(`[cron] triggering ${path}`);
 
-    try {
-      const req = new Request(url, { headers: { Accept: "application/json" } });
-      const res = await openNextHandler.fetch(req, env, ctx);
-      console.log(`[cron] ${path} → HTTP ${res.status}`);
-      if (res.status !== 200) {
-        const body = await res.text();
-        console.error(`[cron] ${path} failed:`, body.slice(0, 300));
+    ctx.waitUntil((async () => {
+      try {
+        const req = new Request(url, { headers: { Accept: "application/json" } });
+        const res = await openNextHandler.fetch(req, env, ctx);
+        console.log(`[cron] ${path} → HTTP ${res.status}`);
+        if (res.status !== 200) {
+          const body = await res.text();
+          console.error(`[cron] ${path} failed:`, body.slice(0, 300));
+        }
+      } catch (err) {
+        console.error(`[cron] ${path} error:`, err);
       }
-    } catch (err) {
-      console.error(`[cron] ${path} error:`, err);
-    }
+    })());
   },
 };
