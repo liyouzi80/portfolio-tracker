@@ -1,5 +1,5 @@
 name = "portfolio-tracker"
-main = ".open-next/worker.js"
+main = "cron-wrapper.js"
 compatibility_date = "2025-05-05"
 compatibility_flags = ["nodejs_compat"]
 
@@ -15,6 +15,13 @@ id = "PLACEHOLDER_KV_ID"
 [assets]
 directory = ".open-next/assets"
 binding = "ASSETS"
+
+[triggers]
+crons = [
+  "*/30 * * * *",
+  "0 8 * * *",
+  "30 6 * * *"
+]
 
 [observability]
 enabled = false

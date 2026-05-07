@@ -1,13 +1,9 @@
-name: Cron Jobs
+name: Cron Jobs (Manual Only)
+
+# Scheduled cron runs via Cloudflare Workers Cron Triggers (see wrangler.toml [triggers]).
+# This workflow is kept for manual ad-hoc runs via workflow_dispatch.
 
 on:
-  schedule:
-    # Every 30 min: price fetch + alert check
-    - cron: "*/30 * * * *"
-    # Daily 08:00 UTC: snapshot
-    - cron: "0 8 * * *"
-    # Daily 06:30 UTC: exchange rates
-    - cron: "30 6 * * *"
   workflow_dispatch:
     inputs:
       job:
@@ -26,12 +22,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Price Fetch
-        if: |
-          (github.event_name == 'workflow_dispatch' && (github.event.inputs.job == 'all' || github.event.inputs.job == 'price-fetch'))
-          || (github.event_name == 'schedule' && github.event.schedule == '*/30 * * * *')
+        if: github.event.inputs.job == 'all' || github.event.inputs.job == 'price-fetch'
         run: |
           echo "Running price-fetch..."
-          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -H "User-Agent: Mozilla/5.0 (compatible; GitHubActions/1.0)" -H "Accept: application/json" "https://${{ secrets.WORKER_HOST }}/api/cron/price-fetch?secret=${{ secrets.CRON_SECRET }}")
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" "https://${{ secrets.WORKER_HOST }}/api/cron/price-fetch?secret=${{ secrets.CRON_SECRET }}")
           HTTP_STATUS=$(echo "$RESPONSE" | grep -oP 'HTTP_STATUS:\K\d+')
           BODY=$(echo "$RESPONSE" | sed '/HTTP_STATUS:/d')
           echo "HTTP Status: $HTTP_STATUS"
@@ -44,12 +38,10 @@ jobs:
           echo "✅ Price-fetch completed"
 
       - name: Snapshot
-        if: |
-          (github.event_name == 'workflow_dispatch' && (github.event.inputs.job == 'all' || github.event.inputs.job == 'snapshot'))
-          || (github.event_name == 'schedule' && github.event.schedule == '0 8 * * *')
+        if: github.event.inputs.job == 'all' || github.event.inputs.job == 'snapshot'
         run: |
           echo "Running snapshot..."
-          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -H "User-Agent: Mozilla/5.0 (compatible; GitHubActions/1.0)" -H "Accept: application/json" "https://${{ secrets.WORKER_HOST }}/api/cron/snapshot?secret=${{ secrets.CRON_SECRET }}")
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" "https://${{ secrets.WORKER_HOST }}/api/cron/snapshot?secret=${{ secrets.CRON_SECRET }}")
           HTTP_STATUS=$(echo "$RESPONSE" | grep -oP 'HTTP_STATUS:\K\d+')
           BODY=$(echo "$RESPONSE" | sed '/HTTP_STATUS:/d')
           echo "HTTP Status: $HTTP_STATUS"
@@ -62,12 +54,10 @@ jobs:
           echo "✅ Snapshot completed"
 
       - name: Rates Fetch
-        if: |
-          (github.event_name == 'workflow_dispatch' && (github.event.inputs.job == 'all' || github.event.inputs.job == 'rates-fetch'))
-          || (github.event_name == 'schedule' && github.event.schedule == '30 6 * * *')
+        if: github.event.inputs.job == 'all' || github.event.inputs.job == 'rates-fetch'
         run: |
           echo "Running rates-fetch..."
-          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -H "User-Agent: Mozilla/5.0 (compatible; GitHubActions/1.0)" -H "Accept: application/json" "https://${{ secrets.WORKER_HOST }}/api/cron/rates-fetch?secret=${{ secrets.CRON_SECRET }}")
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" "https://${{ secrets.WORKER_HOST }}/api/cron/rates-fetch?secret=${{ secrets.CRON_SECRET }}")
           HTTP_STATUS=$(echo "$RESPONSE" | grep -oP 'HTTP_STATUS:\K\d+')
           BODY=$(echo "$RESPONSE" | sed '/HTTP_STATUS:/d')
           echo "HTTP Status: $HTTP_STATUS"
