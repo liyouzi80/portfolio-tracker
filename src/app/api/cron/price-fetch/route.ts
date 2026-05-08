@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
   if (!migrationsRun) {
     try { await d1.prepare("ALTER TABLE assets ADD COLUMN last_price REAL").run(); } catch { /* exists */ }
     try { await d1.prepare("ALTER TABLE assets ADD COLUMN last_price_updated_at TEXT").run(); } catch { /* exists */ }
+    try { await d1.prepare("ALTER TABLE assets ADD COLUMN last_prev_close REAL").run(); } catch { /* exists */ }
     migrationsRun = true;
   }
 
@@ -116,13 +117,13 @@ export async function GET(req: NextRequest) {
     const bestName = cnName || (displayName && displayName !== asset.symbol ? displayName : null);
     if (bestName && bestName !== asset.name) {
       pendingWrites.push(
-        d1.prepare("UPDATE assets SET name = ?, last_price = ?, last_price_updated_at = ? WHERE id = ?")
-          .bind(bestName, price, new Date().toISOString(), asset.id).run().catch(() => {})
+        d1.prepare("UPDATE assets SET name = ?, last_price = ?, last_prev_close = ?, last_price_updated_at = ? WHERE id = ?")
+          .bind(bestName, price, prevClose ?? null, new Date().toISOString(), asset.id).run().catch(() => {})
       );
     } else {
       pendingWrites.push(
-        d1.prepare("UPDATE assets SET last_price = ?, last_price_updated_at = ? WHERE id = ?")
-          .bind(price, new Date().toISOString(), asset.id).run().catch(() => {})
+        d1.prepare("UPDATE assets SET last_price = ?, last_prev_close = ?, last_price_updated_at = ? WHERE id = ?")
+          .bind(price, prevClose ?? null, new Date().toISOString(), asset.id).run().catch(() => {})
       );
     }
 

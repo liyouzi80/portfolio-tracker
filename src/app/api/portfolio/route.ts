@@ -50,6 +50,7 @@ export async function GET(req: NextRequest) {
   const { DB: d1 } = getPlatformEnv();
   if (!migrationsRun) {
     try { await d1.prepare("ALTER TABLE transactions ADD COLUMN tx_hash TEXT").run(); } catch { /* exists */ }
+    try { await d1.prepare("ALTER TABLE assets ADD COLUMN last_prev_close REAL").run(); } catch { /* exists */ }
     migrationsRun = true;
   }
 
@@ -172,16 +173,16 @@ export async function GET(req: NextRequest) {
     const holdings = Array.from(holdingsMap.values());
 
     // D1 batch price lookup
-    const d1PriceMap = new Map<string, { price: number; updatedAt?: number }>();
+    const d1PriceMap = new Map<string, { price: number; prevClose?: number; updatedAt?: number }>();
     if (holdings.length > 0) {
       try {
         const placeholders = holdings.map(() => '?').join(',');
         const rows = await d1.prepare(
-          `SELECT id, last_price, last_price_updated_at FROM assets WHERE id IN (${placeholders})`
-        ).bind(...holdings.map(h => h.assetId)).all<{ id: string; last_price: number | null; last_price_updated_at: string | null }>();
+          `SELECT id, last_price, last_prev_close, last_price_updated_at FROM assets WHERE id IN (${placeholders})`
+        ).bind(...holdings.map(h => h.assetId)).all<{ id: string; last_price: number | null; last_prev_close: number | null; last_price_updated_at: string | null }>();
         for (const row of rows.results) {
           if (row.last_price && row.last_price > 0) {
-            d1PriceMap.set(row.id, { price: row.last_price, updatedAt: row.last_price_updated_at ? new Date(row.last_price_updated_at).getTime() : undefined });
+            d1PriceMap.set(row.id, { price: row.last_price, prevClose: row.last_prev_close ?? undefined, updatedAt: row.last_price_updated_at ? new Date(row.last_price_updated_at).getTime() : undefined });
           }
         }
       } catch { /* ignore — live fetch will cover */ }
@@ -191,7 +192,7 @@ export async function GET(req: NextRequest) {
     for (const h of holdings) {
       const row = d1PriceMap.get(h.assetId);
       if (row) {
-        priceCache.set(h.symbol + h.market, { price: row.price, updatedAt: row.updatedAt });
+        priceCache.set(h.symbol + h.market, { price: row.price, prevClose: row.prevClose, updatedAt: row.updatedAt });
       }
       // Refresh if no cached price or older than 1h (cron runs every 30m)
       if (!row || !row.updatedAt || (Date.now() - row.updatedAt > 3_600_000)) {
@@ -203,12 +204,12 @@ export async function GET(req: NextRequest) {
     if (missingPrices.length > 0) {
       const assetIdByKey = new Map(missingPrices.map(p => [`${p.market}:${p.symbol}`, p.assetId]));
       const d1Updates: Promise<unknown>[] = [];
-      const updateD1 = (market: string, symbol: string, price: number) => {
+      const updateD1 = (market: string, symbol: string, price: number, prevClose?: number) => {
         const assetId = assetIdByKey.get(`${market}:${symbol}`);
         if (assetId) {
           d1Updates.push(
-            d1.prepare("UPDATE assets SET last_price = ?, last_price_updated_at = ? WHERE id = ?")
-              .bind(price, new Date().toISOString(), assetId).run().catch(() => {})
+            d1.prepare("UPDATE assets SET last_price = ?, last_prev_close = ?, last_price_updated_at = ? WHERE id = ?")
+              .bind(price, prevClose ?? null, new Date().toISOString(), assetId).run().catch(() => {})
           );
         }
       };
@@ -224,14 +225,14 @@ export async function GET(req: NextRequest) {
       for (const [k, v] of lbPrices) {
         priceCache.set(k.split(":")[1] + k.split(":")[0], { price: v.price, prevClose: v.prevClose, updatedAt: Date.now() });
         const [market, symbol] = k.split(":");
-        updateD1(market, symbol, v.price);
+        updateD1(market, symbol, v.price, v.prevClose);
       }
       const hkMissedByLB = hkSymbols.filter(s => !lbPrices.has(`${s.market}:${s.symbol}`));
       const tencentHK = hkMissedByLB.length > 0 ? await fetchTencentPrices(hkMissedByLB) : new Map();
       for (const [k, v] of tencentHK) {
         priceCache.set(k.split(":")[1] + k.split(":")[0], { price: v.price, prevClose: v.prevClose, updatedAt: Date.now() });
         const [market, symbol] = k.split(":");
-        updateD1(market, symbol, v.price);
+        updateD1(market, symbol, v.price, v.prevClose);
       }
 
       // CN: Tencent
@@ -240,7 +241,7 @@ export async function GET(req: NextRequest) {
         for (const [k, v] of tencentCN) {
           priceCache.set(k.split(":")[1] + k.split(":")[0], { price: v.price, prevClose: v.prevClose, updatedAt: Date.now() });
           const [market, symbol] = k.split(":");
-          updateD1(market, symbol, v.price);
+          updateD1(market, symbol, v.price, v.prevClose);
         }
       }
 
@@ -253,7 +254,7 @@ export async function GET(req: NextRequest) {
         for (const { s, price, prevClose, name } of fhResults) {
           if (price) {
             priceCache.set(s.symbol + s.market, { price, prevClose, updatedAt: Date.now() });
-            updateD1(s.market, s.symbol, price);
+            updateD1(s.market, s.symbol, price, prevClose);
           }
         }
       }
@@ -267,7 +268,7 @@ export async function GET(req: NextRequest) {
         for (const { s, price, prevClose, name } of yahooResults) {
           if (price) {
             priceCache.set(s.symbol + s.market, { price, prevClose, updatedAt: Date.now() });
-            updateD1(s.market, s.symbol, price);
+            updateD1(s.market, s.symbol, price, prevClose);
           }
         }
       }

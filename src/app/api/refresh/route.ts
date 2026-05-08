@@ -28,6 +28,7 @@ export async function POST(_req: NextRequest) {
   } catch { /* ignore — proceed */ }
 
   const startTime = Date.now();
+  try { await d1.prepare("ALTER TABLE assets ADD COLUMN last_prev_close REAL").run(); } catch { /* exists */ }
   const db = getDb(d1);
   const allAssets = await db.select().from(assets).all();
 
@@ -78,13 +79,13 @@ export async function POST(_req: NextRequest) {
       const bestName = cnName || (displayName && displayName !== asset.symbol ? displayName : null);
       if (bestName && bestName !== asset.name) {
         pendingWrites.push(
-          d1.prepare("UPDATE assets SET name = ?, last_price = ?, last_price_updated_at = ? WHERE id = ?")
-            .bind(bestName, price, new Date().toISOString(), asset.id).run().catch(() => {})
+          d1.prepare("UPDATE assets SET name = ?, last_price = ?, last_prev_close = ?, last_price_updated_at = ? WHERE id = ?")
+            .bind(bestName, price, prevClose ?? null, new Date().toISOString(), asset.id).run().catch(() => {})
         );
       } else {
         pendingWrites.push(
-          d1.prepare("UPDATE assets SET last_price = ?, last_price_updated_at = ? WHERE id = ?")
-            .bind(price, new Date().toISOString(), asset.id).run().catch(() => {})
+          d1.prepare("UPDATE assets SET last_price = ?, last_prev_close = ?, last_price_updated_at = ? WHERE id = ?")
+            .bind(price, prevClose ?? null, new Date().toISOString(), asset.id).run().catch(() => {})
         );
       }
 

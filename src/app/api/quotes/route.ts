@@ -28,10 +28,11 @@ export async function GET(req: NextRequest) {
 
     try {
       const row = await DB.prepare(
-        "SELECT last_price, name FROM assets WHERE symbol = ? AND market = ?"
-      ).bind(symbol, market).first<{ last_price: number | null; name: string | null }>();
+        "SELECT last_price, last_prev_close, name FROM assets WHERE symbol = ? AND market = ?"
+      ).bind(symbol, market).first<{ last_price: number | null; last_prev_close: number | null; name: string | null }>();
       if (row?.last_price && row.last_price > 0) {
         price = row.last_price;
+        prevClose = row.last_prev_close ?? undefined;
         if (row.name) name = row.name;
       }
     } catch { /* ignore */ }

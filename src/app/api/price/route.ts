@@ -11,15 +11,17 @@ export async function GET(req: NextRequest) {
 
   const { DB: d1 } = getPlatformEnv();
 
+  try { await d1.prepare("ALTER TABLE assets ADD COLUMN last_prev_close REAL").run(); } catch { /* exists */ }
+
   // Check D1 for recent price (< 15 min old)
   try {
     const row = await d1.prepare(
-      "SELECT last_price, last_price_updated_at FROM assets WHERE symbol = ? AND market = ?"
-    ).bind(symbol, market).first<{ last_price: number | null; last_price_updated_at: string | null }>();
+      "SELECT last_price, last_prev_close, last_price_updated_at FROM assets WHERE symbol = ? AND market = ?"
+    ).bind(symbol, market).first<{ last_price: number | null; last_prev_close: number | null; last_price_updated_at: string | null }>();
     if (row?.last_price && row.last_price > 0 && row.last_price_updated_at) {
       const age = Date.now() - new Date(row.last_price_updated_at).getTime();
       if (age < 900_000) {
-        return NextResponse.json({ symbol, market, price: row.last_price, updatedAt: new Date(row.last_price_updated_at).getTime() });
+        return NextResponse.json({ symbol, market, price: row.last_price, prevClose: row.last_prev_close ?? undefined, updatedAt: new Date(row.last_price_updated_at).getTime() });
       }
     }
   } catch { /* proceed to live fetch */ }
@@ -49,20 +51,20 @@ export async function GET(req: NextRequest) {
   // 3. Finnhub (free US stocks, 60 req/min)
   if (price === null && market === "US") {
     const finnhub = await fetchFinnhubPrice(symbol, market);
-    if (finnhub) { price = finnhub.price; name = finnhub.name; source = "finnhub"; }
+    if (finnhub) { price = finnhub.price; name = finnhub.name; prevClose = finnhub.prevClose; source = "finnhub"; }
   }
 
   // 4. Yahoo Finance (backup)
   if (price === null) {
     const quote = await fetchYahooQuote(symbol, market);
-    if (quote) { price = quote.price; name = name || quote.name; source = "yahoo"; }
+    if (quote) { price = quote.price; name = name || quote.name; prevClose = prevClose ?? quote.prevClose; source = "yahoo"; }
   }
 
   const data = { symbol, market, price, name, source, prevClose, updatedAt: Date.now() };
   if (price !== null) {
     d1.prepare(
-      "UPDATE assets SET last_price = ?, last_price_updated_at = ? WHERE symbol = ? AND market = ?"
-    ).bind(price, new Date().toISOString(), symbol, market).run().catch(() => {});
+      "UPDATE assets SET last_price = ?, last_prev_close = ?, last_price_updated_at = ? WHERE symbol = ? AND market = ?"
+    ).bind(price, prevClose ?? null, new Date().toISOString(), symbol, market).run().catch(() => {});
   }
 
   return NextResponse.json(data);
