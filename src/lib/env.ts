@@ -2,5 +2,5 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 export function getPlatformEnv() {
   const { env } = getCloudflareContext();
-  return env as { DB: D1Database; PRICE_CACHE: KVNamespace };
+  return env as { DB: D1Database };
 }

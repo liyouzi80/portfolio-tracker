@@ -90,7 +90,6 @@ export async function GET(req: NextRequest) {
     return rate;
   };
 
-  const { PRICE_CACHE } = getPlatformEnv();
   const priceCache = new Map<string, { price: number; prevClose?: number; updatedAt?: number }>();
 
   const accountSummaries: AccountSummary[] = [];
@@ -172,33 +171,51 @@ export async function GET(req: NextRequest) {
 
     const holdings = Array.from(holdingsMap.values());
 
-    // Batch KV cache lookup (parallel)
-    const cacheLookups = await Promise.all(
-      holdings.map(async (h) => {
-        const cacheKey = `price:${h.market}:${h.symbol}`;
-        try {
-          const cached = await PRICE_CACHE.get(cacheKey, "json") as { price?: number; prevClose?: number; updatedAt?: number } | null;
-          if (cached?.price) return { holding: h, cached };
-        } catch { /* ignore */ }
-        return { holding: h, cached: null };
-      })
-    );
+    // D1 batch price lookup
+    const d1PriceMap = new Map<string, { price: number; updatedAt?: number }>();
+    if (holdings.length > 0) {
+      try {
+        const placeholders = holdings.map(() => '?').join(',');
+        const rows = await d1.prepare(
+          `SELECT id, last_price, last_price_updated_at FROM assets WHERE id IN (${placeholders})`
+        ).bind(...holdings.map(h => h.assetId)).all<{ id: string; last_price: number | null; last_price_updated_at: string | null }>();
+        for (const row of rows.results) {
+          if (row.last_price && row.last_price > 0) {
+            d1PriceMap.set(row.id, { price: row.last_price, updatedAt: row.last_price_updated_at ? new Date(row.last_price_updated_at).getTime() : undefined });
+          }
+        }
+      } catch { /* ignore — live fetch will cover */ }
+    }
 
-    const missingPrices: Array<{ symbol: string; market: string }> = [];
-    for (const { holding, cached } of cacheLookups) {
-      if (cached?.price) {
-        priceCache.set(holding.symbol + holding.market, { price: cached.price, prevClose: cached.prevClose, updatedAt: cached.updatedAt as number | undefined });
-      } else {
-        missingPrices.push({ symbol: holding.symbol, market: holding.market });
+    const missingPrices: Array<{ symbol: string; market: string; assetId: string }> = [];
+    for (const h of holdings) {
+      const row = d1PriceMap.get(h.assetId);
+      if (row) {
+        priceCache.set(h.symbol + h.market, { price: row.price, updatedAt: row.updatedAt });
+      }
+      // Refresh if no cached price or older than 1h (cron runs every 30m)
+      if (!row || !row.updatedAt || (Date.now() - row.updatedAt > 3_600_000)) {
+        missingPrices.push({ symbol: h.symbol, market: h.market, assetId: h.assetId });
       }
     }
 
-    // Live fetch for missing — dispatch per market to optimal source
+    // Live fetch for stale/missing — dispatch per market to optimal source
     if (missingPrices.length > 0) {
+      const assetIdByKey = new Map(missingPrices.map(p => [`${p.market}:${p.symbol}`, p.assetId]));
+      const d1Updates: Promise<unknown>[] = [];
+      const updateD1 = (market: string, symbol: string, price: number) => {
+        const assetId = assetIdByKey.get(`${market}:${symbol}`);
+        if (assetId) {
+          d1Updates.push(
+            d1.prepare("UPDATE assets SET last_price = ?, last_price_updated_at = ? WHERE id = ?")
+              .bind(price, new Date().toISOString(), assetId).run().catch(() => {})
+          );
+        }
+      };
+
       const hkSymbols = missingPrices.filter(p => p.market === "HK");
       const usSymbols = missingPrices.filter(p => p.market === "US");
       const cnSymbols = missingPrices.filter(p => p.market === "CN");
-      // Markets Tencent can't handle: use Yahoo
       const yahooMarkets = new Set(["JP", "KR", "GB", "DE", "FR", "NL", "ES", "IT", "CH", "CA", "AU", "TW", "IN"]);
       const yahooSymbols = missingPrices.filter(p => yahooMarkets.has(p.market));
 
@@ -207,14 +224,14 @@ export async function GET(req: NextRequest) {
       for (const [k, v] of lbPrices) {
         priceCache.set(k.split(":")[1] + k.split(":")[0], { price: v.price, prevClose: v.prevClose, updatedAt: Date.now() });
         const [market, symbol] = k.split(":");
-        PRICE_CACHE.put(`price:${market}:${symbol}`, JSON.stringify({ symbol, market, price: v.price, prevClose: v.prevClose, name: v.name || symbol, updatedAt: Date.now() }), { expirationTtl: 86400 }).catch(() => {});
+        updateD1(market, symbol, v.price);
       }
       const hkMissedByLB = hkSymbols.filter(s => !lbPrices.has(`${s.market}:${s.symbol}`));
       const tencentHK = hkMissedByLB.length > 0 ? await fetchTencentPrices(hkMissedByLB) : new Map();
       for (const [k, v] of tencentHK) {
         priceCache.set(k.split(":")[1] + k.split(":")[0], { price: v.price, prevClose: v.prevClose, updatedAt: Date.now() });
         const [market, symbol] = k.split(":");
-        PRICE_CACHE.put(`price:${market}:${symbol}`, JSON.stringify({ symbol, market, price: v.price, prevClose: v.prevClose, name: v.name || symbol, updatedAt: Date.now() }), { expirationTtl: 86400 }).catch(() => {});
+        updateD1(market, symbol, v.price);
       }
 
       // CN: Tencent
@@ -223,11 +240,11 @@ export async function GET(req: NextRequest) {
         for (const [k, v] of tencentCN) {
           priceCache.set(k.split(":")[1] + k.split(":")[0], { price: v.price, prevClose: v.prevClose, updatedAt: Date.now() });
           const [market, symbol] = k.split(":");
-          PRICE_CACHE.put(`price:${market}:${symbol}`, JSON.stringify({ symbol, market, price: v.price, prevClose: v.prevClose, name: v.name || symbol, updatedAt: Date.now() }), { expirationTtl: 86400 }).catch(() => {});
+          updateD1(market, symbol, v.price);
         }
       }
 
-      // US: Finnhub (Tencent US endpoint blocks Workers, Finnhub has prevClose)
+      // US: Finnhub
       if (usSymbols.length > 0) {
         const fhResults = await Promise.all(usSymbols.map(async (s) => {
           const fh = await fetchFinnhubPrice(s.symbol, s.market);
@@ -236,12 +253,12 @@ export async function GET(req: NextRequest) {
         for (const { s, price, prevClose, name } of fhResults) {
           if (price) {
             priceCache.set(s.symbol + s.market, { price, prevClose, updatedAt: Date.now() });
-            PRICE_CACHE.put(`price:${s.market}:${s.symbol}`, JSON.stringify({ symbol: s.symbol, market: s.market, price, prevClose, name: name || s.symbol, updatedAt: Date.now() }), { expirationTtl: 86400 }).catch(() => {});
+            updateD1(s.market, s.symbol, price);
           }
         }
       }
 
-      // JP/KR/GB/... : Yahoo (parallel, free, multi-market)
+      // JP/KR/GB/... : Yahoo
       if (yahooSymbols.length > 0) {
         const yahooResults = await Promise.all(yahooSymbols.map(async (s) => {
           const yq = await fetchYahooQuote(s.symbol, s.market);
@@ -250,11 +267,12 @@ export async function GET(req: NextRequest) {
         for (const { s, price, prevClose, name } of yahooResults) {
           if (price) {
             priceCache.set(s.symbol + s.market, { price, prevClose, updatedAt: Date.now() });
-            PRICE_CACHE.put(`price:${s.market}:${s.symbol}`, JSON.stringify({ symbol: s.symbol, market: s.market, price, prevClose, name: name || s.symbol, updatedAt: Date.now() }), { expirationTtl: 86400 }).catch(() => {});
+            updateD1(s.market, s.symbol, price);
           }
         }
       }
 
+      await Promise.all(d1Updates);
     }
 
     // Compute per-holding P&L (in holding currency and converted)
@@ -263,15 +281,11 @@ export async function GET(req: NextRequest) {
       let cp = cached?.price;
       const pc = cached?.prevClose;
 
-      // If KV cache and live fetch both missed, fall back to last known price
-      // stored in the assets table (persisted across KV cache expirations).
+      // priceCache is already populated from D1 batch query at top of this block.
+      // If live fetch also missed, priceCache still holds the last known D1 price.
       if (!cp || cp <= 0) {
-        try {
-          const row = await d1.prepare(
-            "SELECT last_price FROM assets WHERE id = ?"
-          ).bind(h.assetId).first<{ last_price: number | null }>();
-          if (row?.last_price && row.last_price > 0) cp = row.last_price;
-        } catch { /* ignore */ }
+        const d1Row = d1PriceMap.get(h.assetId);
+        if (d1Row?.price && d1Row.price > 0) cp = d1Row.price;
       }
 
       const rate = getRate(h.currency, baseCurrency);

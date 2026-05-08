@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   if (cronSecret && req.nextUrl.searchParams.get("secret") !== cronSecret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const { DB: d1, PRICE_CACHE } = getPlatformEnv();
+  const { DB: d1 } = getPlatformEnv();
   const db = getDb(d1);
 
   const allAssets = await db.select().from(assets).all();
@@ -112,12 +112,6 @@ export async function GET(req: NextRequest) {
     const { price, prevClose, name: displayName, source } = priceData;
     const cnName = getChineseName(asset.symbol, asset.market);
     const nameForCache = cnName || (displayName && displayName !== asset.symbol ? displayName : asset.symbol);
-
-    pendingWrites.push(
-      PRICE_CACHE.put(`price:${asset.market}:${asset.symbol}`, JSON.stringify({
-        symbol: asset.symbol, market: asset.market, name: nameForCache, price, prevClose, source, updatedAt: Date.now(),
-      }), { expirationTtl: 86400 }).catch(() => {})
-    );
 
     const bestName = cnName || (displayName && displayName !== asset.symbol ? displayName : null);
     if (bestName && bestName !== asset.name) {

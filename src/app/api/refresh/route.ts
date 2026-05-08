@@ -6,18 +6,18 @@ import { fetchTencentPrice, fetchFinnhubPrice, fetchLongbridgePrice, fetchYahooQ
 import { getChineseName } from "@/lib/stock-names";
 import { eq } from "drizzle-orm";
 
-const THROTTLE_KEY = "last_manual_refresh";
 const THROTTLE_SECONDS = 60;
 
 export async function POST(_req: NextRequest) {
-  const { DB: d1, PRICE_CACHE } = getPlatformEnv();
+  const { DB: d1 } = getPlatformEnv();
 
-  // ── Throttle check ─────────────────────────────────
+  // Throttle check via D1
   try {
-    const last = await PRICE_CACHE.get(THROTTLE_KEY);
-    if (last) {
-      const lastTs = parseInt(last, 10);
-      const elapsed = Math.floor((Date.now() - lastTs) / 1000);
+    const recent = await d1.prepare(
+      "SELECT MAX(last_price_updated_at) as latest FROM assets"
+    ).first<{ latest: string | null }>();
+    if (recent?.latest) {
+      const elapsed = Math.floor((Date.now() - new Date(recent.latest).getTime()) / 1000);
       if (elapsed < THROTTLE_SECONDS) {
         return NextResponse.json(
           { success: false, retryAfter: THROTTLE_SECONDS - elapsed, error: "请稍候再试" },
@@ -26,11 +26,6 @@ export async function POST(_req: NextRequest) {
       }
     }
   } catch { /* ignore — proceed */ }
-
-  // 记录触发时间，避免并发重复触发
-  try {
-    await PRICE_CACHE.put(THROTTLE_KEY, String(Date.now()), { expirationTtl: 120 });
-  } catch { /* ignore */ }
 
   const startTime = Date.now();
   const db = getDb(d1);
@@ -79,13 +74,6 @@ export async function POST(_req: NextRequest) {
       updated++;
 
       const cnName = getChineseName(asset.symbol, asset.market);
-      const nameForCache = cnName || (displayName && displayName !== asset.symbol ? displayName : asset.symbol);
-
-      pendingWrites.push(
-        PRICE_CACHE.put(`price:${asset.market}:${asset.symbol}`, JSON.stringify({
-          symbol: asset.symbol, market: asset.market, name: nameForCache, price, prevClose, source: "manual", updatedAt: Date.now(),
-        }), { expirationTtl: 86400 }).catch(() => {})
-      );
 
       const bestName = cnName || (displayName && displayName !== asset.symbol ? displayName : null);
       if (bestName && bestName !== asset.name) {

@@ -30,21 +30,7 @@ export async function GET(req: NextRequest) {
     .offset(offset)
     .all();
 
-  // Enrich asset names from KV price cache
-  const { PRICE_CACHE } = getPlatformEnv();
-  const enriched = await Promise.all(result.map(async (row) => {
-    const asset = row.assets;
-    if (!asset || (asset.name && asset.name !== asset.symbol)) return row;
-    try {
-      const cached = await PRICE_CACHE.get(`price:${asset.market}:${asset.symbol}`, "json") as { name?: string } | null;
-      if (cached?.name && cached.name !== asset.symbol) {
-        return { ...row, assets: { ...asset, name: cached.name } };
-      }
-    } catch { /* ignore */ }
-    return row;
-  }));
-
-  return NextResponse.json(enriched);
+  return NextResponse.json(result);
 }
 
 async function txHash(body: { accountId: string; assetId: string; type: string; quantity: number; price: number; fee?: number; date: string }): Promise<string> {

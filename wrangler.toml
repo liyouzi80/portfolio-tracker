@@ -9,10 +9,6 @@ binding = "DB"
 database_name = "portfolio-db"
 database_id = "PLACEHOLDER_D1_ID"
 
-[[kv_namespaces]]
-binding = "PRICE_CACHE"
-id = "PLACEHOLDER_KV_ID"
-
 [assets]
 directory = ".open-next/assets"
 binding = "ASSETS"

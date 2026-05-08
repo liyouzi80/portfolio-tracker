@@ -18,6 +18,8 @@ export const assets = sqliteTable(
     market: text("market").notNull(), // US, HK, CN
     currency: text("currency").notNull(),
     assetType: text("asset_type").default("stock"), // stock, etf, crypto, fund
+    lastPrice: real("last_price"),
+    lastPriceUpdatedAt: text("last_price_updated_at"),
   },
   (table) => [uniqueIndex("idx_assets_symbol_market").on(table.symbol, table.market)]
 );

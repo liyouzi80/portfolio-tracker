@@ -48,7 +48,6 @@ export async function GET(req: NextRequest) {
   };
 
   const ratesSnapshot = Object.fromEntries(allRates.map(r => [`${r.fromCurrency}→${r.toCurrency}`, r.rate]));
-  const { PRICE_CACHE } = getPlatformEnv();
 
   const accountsList = await db.select().from(accounts).all();
   const results: Array<{ account: string; cost: number; marketValue: number }> = [];
@@ -88,16 +87,30 @@ export async function GET(req: NextRequest) {
     const holdings = Array.from(holdingsMap.values());
     if (holdings.length === 0) continue;
 
-    // Fetch prices: KV first, then live API
+    // Fetch prices from D1, then live API for anything missing
     const priceCache = new Map<string, { price: number }>();
     const missing: Array<{ symbol: string; market: string }> = [];
 
-    for (const h of holdings) {
+    const assetIds = Array.from(holdingsMap.keys());
+    if (assetIds.length > 0) {
       try {
-        const cached = await PRICE_CACHE.get(`price:${h.market}:${h.symbol}`, "json") as { price?: number } | null;
-        if (cached?.price) { priceCache.set(`${h.market}:${h.symbol}`, { price: cached.price }); }
-        else { missing.push({ symbol: h.symbol, market: h.market }); }
-      } catch { missing.push({ symbol: h.symbol, market: h.market }); }
+        const placeholders = assetIds.map(() => '?').join(',');
+        const rows = await d1.prepare(
+          `SELECT id, last_price FROM assets WHERE id IN (${placeholders})`
+        ).bind(...assetIds).all<{ id: string; last_price: number | null }>();
+        for (const row of rows.results) {
+          if (row.last_price && row.last_price > 0) {
+            const h = holdingsMap.get(row.id);
+            if (h) priceCache.set(`${h.market}:${h.symbol}`, { price: row.last_price });
+          }
+        }
+      } catch { /* proceed to live fetch */ }
+    }
+
+    for (const h of holdings) {
+      if (!priceCache.has(`${h.market}:${h.symbol}`)) {
+        missing.push({ symbol: h.symbol, market: h.market });
+      }
     }
 
     if (missing.length > 0) {

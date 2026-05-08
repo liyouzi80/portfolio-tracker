@@ -13,9 +13,9 @@ export async function GET(
   const asset = await db.select().from(assets).where(eq(assets.id, id)).all();
   if (!asset.length) return NextResponse.json({ price: null }, { status: 404 });
 
-  const { PRICE_CACHE } = getPlatformEnv();
-  const cacheKey = `price:${asset[0].market}:${asset[0].symbol}`;
-  const cached = await PRICE_CACHE.get(cacheKey, "json");
-  if (cached) return NextResponse.json(cached);
+  const a = asset[0];
+  if (a.lastPrice && a.lastPrice > 0) {
+    return NextResponse.json({ symbol: a.symbol, market: a.market, price: a.lastPrice, name: a.name, updatedAt: a.lastPriceUpdatedAt });
+  }
   return NextResponse.json({ price: null });
 }
