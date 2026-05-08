@@ -194,8 +194,8 @@ export async function GET(req: NextRequest) {
       if (row) {
         priceCache.set(h.symbol + h.market, { price: row.price, prevClose: row.prevClose, updatedAt: row.updatedAt });
       }
-      // Refresh if no cached price or older than 1h (cron runs every 30m)
-      if (!row || !row.updatedAt || (Date.now() - row.updatedAt > 3_600_000)) {
+      // Refresh if no cached price, older than 1h, or missing prevClose (cron runs every 30m)
+      if (!row || !row.updatedAt || !row.prevClose || (Date.now() - row.updatedAt > 3_600_000)) {
         missingPrices.push({ symbol: h.symbol, market: h.market, assetId: h.assetId });
       }
     }
