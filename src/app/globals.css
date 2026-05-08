@@ -211,6 +211,7 @@ body:not(.dark) {
 
 html:not(.dark) body { background: #fafafa; color: #18181b; }
 html:not(.dark) .bg-zinc-950,
+html:not(.dark) .bg-zinc-950\/95,
 html:not(.dark) .bg-zinc-950\/\[0\.02\] { background: #fff; }
 html:not(.dark) .bg-zinc-900,
 html:not(.dark) .bg-zinc-900\/80,

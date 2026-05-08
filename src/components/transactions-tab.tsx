@@ -216,7 +216,7 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
 
         <div className="flex gap-2 mt-3">
           <div className="relative flex-1">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
             <Input
               placeholder="搜索代码..."
               value={search}
@@ -241,22 +241,22 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
       <CardContent>
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 text-zinc-500 animate-spin" />
+            <Loader2 className="h-6 w-6 text-zinc-400 animate-spin" />
           </div>
         ) : (
           <div className="overflow-auto max-h-[60vh] md:max-h-[70vh]"><Table>
             <TableHeader className="sticky top-0 z-10 bg-zinc-950/95 backdrop-blur-sm">
               <TableRow className="border-zinc-800 hover:bg-transparent">
-                <TableHead className="text-zinc-500">日期</TableHead>
-                <TableHead className="text-zinc-500">账户</TableHead>
-                <TableHead className="text-zinc-500">名称</TableHead>
-                <TableHead className="text-zinc-500">代码</TableHead>
-                <TableHead className="text-zinc-500">类型</TableHead>
-                <TableHead className="text-zinc-500 text-right">数量</TableHead>
-                <TableHead className="text-zinc-500 text-right">价格</TableHead>
-                <TableHead className="text-zinc-500 text-right">手续费</TableHead>
-                <TableHead className="text-zinc-500 text-right">总额</TableHead>
-                <TableHead className="text-zinc-500 w-10" />
+                <TableHead className="text-zinc-400">日期</TableHead>
+                <TableHead className="text-zinc-400">账户</TableHead>
+                <TableHead className="text-zinc-400">名称</TableHead>
+                <TableHead className="text-zinc-400">代码</TableHead>
+                <TableHead className="text-zinc-400">类型</TableHead>
+                <TableHead className="text-zinc-400 text-right">数量</TableHead>
+                <TableHead className="text-zinc-400 text-right">价格</TableHead>
+                <TableHead className="text-zinc-400 text-right">手续费</TableHead>
+                <TableHead className="text-zinc-400 text-right">总额</TableHead>
+                <TableHead className="text-zinc-400 w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -273,7 +273,7 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
                   </TableCell>
                   <TableCell className="text-right font-mono tabular-nums text-zinc-100">{fmtQuantity(t.quantity)}</TableCell>
                   <TableCell className="text-right font-mono tabular-nums text-zinc-100">{t.currency} {fmtMoney(t.price)}</TableCell>
-                  <TableCell className="text-right font-mono tabular-nums text-zinc-500">{t.currency} {fmtMoney(t.fee)}</TableCell>
+                  <TableCell className="text-right font-mono tabular-nums text-zinc-400">{t.currency} {fmtMoney(t.fee)}</TableCell>
                   <TableCell className="text-right font-mono tabular-nums text-zinc-100">
                     {t.currency} {fmtMoney(t.quantity * t.price + (t.type === "sell" ? -t.fee : t.fee))}
                   </TableCell>
@@ -282,7 +282,7 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-zinc-500 hover:text-zinc-300"
+                        className="h-7 w-7 text-zinc-400 hover:text-zinc-300"
                         onClick={() => handleEdit(t)}
                       >
                         <Pencil className="h-3.5 w-3.5" />
@@ -290,7 +290,7 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-zinc-500 hover:text-red-400"
+                        className="h-7 w-7 text-zinc-400 hover:text-red-400"
                         disabled={deleting === t.id}
                         onClick={() => handleDelete(t.id)}
                       >
@@ -306,7 +306,7 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
               ))}
               {filtered.length === 0 && !loading && (
                 <TableRow className="border-zinc-800">
-                  <TableCell colSpan={9} className="text-center text-zinc-500 py-8">
+                  <TableCell colSpan={9} className="text-center text-zinc-400 py-8">
                     暂无交易记录
                   </TableCell>
                 </TableRow>

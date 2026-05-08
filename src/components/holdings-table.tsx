@@ -60,15 +60,15 @@ export function HoldingsTable({ data, onSymbolClick }: { data: Holding[]; onSymb
     <div className="overflow-auto max-h-[60vh] md:max-h-[600px]"><Table>
       <TableHeader className="sticky top-0 z-10 bg-zinc-950/95 backdrop-blur-sm">
         <TableRow className="border-zinc-800 hover:bg-transparent">
-          <TableHead className="text-zinc-500">代码</TableHead>
-          <TableHead className="text-zinc-500">名称</TableHead>
-          <TableHead className="text-zinc-500">市场</TableHead>
-          <TableHead className="text-zinc-500 text-right">数量</TableHead>
-          <TableHead className="text-zinc-500 text-right">均价</TableHead>
-          <TableHead className="text-zinc-500 text-right">现价</TableHead>
-          <TableHead className="text-zinc-500 text-right">成本</TableHead>
-          <TableHead className="text-zinc-500 text-right">盈亏</TableHead>
-          <TableHead className="text-zinc-500 w-8" />
+          <TableHead className="text-zinc-400">代码</TableHead>
+          <TableHead className="text-zinc-400">名称</TableHead>
+          <TableHead className="text-zinc-400">市场</TableHead>
+          <TableHead className="text-zinc-400 text-right">数量</TableHead>
+          <TableHead className="text-zinc-400 text-right">均价</TableHead>
+          <TableHead className="text-zinc-400 text-right">现价</TableHead>
+          <TableHead className="text-zinc-400 text-right">成本</TableHead>
+          <TableHead className="text-zinc-400 text-right">盈亏</TableHead>
+          <TableHead className="text-zinc-400 w-8" />
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -97,14 +97,14 @@ export function HoldingsTable({ data, onSymbolClick }: { data: Holding[]; onSymb
                   {h.currency} {fmtMoney(h.currentPrice)}
                 </span>
               ) : (
-                <span className="text-zinc-500">--</span>
+                <span className="text-zinc-400">--</span>
               )}
             </TableCell>
             <TableCell className="text-right font-mono tabular-nums text-zinc-100">
               {h.currency} {fmtMoney(h.totalCost)}
             </TableCell>
             <TableCell className={`text-right font-mono tabular-nums ${
-              h.pnl === undefined ? 'text-zinc-500' : h.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'
+              h.pnl === undefined ? 'text-zinc-400' : h.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'
             }`}>
               {h.pnl !== undefined ? `${h.currency} ${fmtMoneySigned(h.pnl)}` : "--"}
               {h.pnlPct !== undefined && <span className="text-xs ml-1">({fmtPercent(h.pnlPct)})</span>}
@@ -114,7 +114,7 @@ export function HoldingsTable({ data, onSymbolClick }: { data: Holding[]; onSymb
                 href={tradingViewUrl(h.symbol, h.market)}
                 target="_blank"
                 rel="noreferrer"
-                className="text-zinc-500 hover:text-zinc-300 transition-colors"
+                className="text-zinc-400 hover:text-zinc-300 transition-colors"
                 title="在 TradingView 查看"
               >
                 <ExternalLink className="h-3.5 w-3.5" />

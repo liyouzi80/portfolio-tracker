@@ -33,7 +33,7 @@ CSV / Excel 批量导入交易记录，支持中英文表头、自动识别 A �
 - 所有 API 走 middleware 鉴权（除登录路由和 cron 自鉴权路由）
 
 **灾备容错**
-- 价格 KV 缓存 24h TTL；缺失时回退到 D1 `assets.last_price`
+- 价格缓存在 D1 `assets.last_price`，cron 每 30 分钟刷新；缺失时实时拉取行情源
 - 缺汇率时跳过该持仓而不是归零
 - 行情源失败时按链路降级，不让单个 API 故障搞垮整个 dashboard
 
@@ -46,7 +46,7 @@ CSV / Excel 批量导入交易记录，支持中英文表头、自动识别 A �
 | 框架 | Next.js 14 App Router |
 | 部署 | Cloudflare Workers via [@opennextjs/cloudflare](https://github.com/opennextjs/opennextjs-cloudflare) |
 | 数据库 | Cloudflare D1（SQLite at edge）+ Drizzle ORM |
-| 缓存 | Cloudflare KV（价格 24h TTL） |
+| 缓存 | D1 `assets.last_price`（cron 每 30 分钟刷新） |
 | UI | shadcn/ui + Tailwind CSS v3 |
 | 图表 | TradingView Lightweight Charts |
 | 认证 | WebAuthn PRF + PBKDF2-SHA256 + JWT (jose) |
@@ -80,11 +80,9 @@ wrangler login
 wrangler d1 create portfolio-db
 # 记下输出的 database_id
 
-wrangler kv namespace create PRICE_CACHE
-# 记下输出的 id
 ```
 
-把两个 ID 作为 GitHub Secrets（见下一步），**不要**直接写到 `wrangler.toml` 里。`wrangler.toml` 中已预留占位符 `PLACEHOLDER_D1_ID` 和 `PLACEHOLDER_KV_ID`，部署时 GitHub Actions 会自动替换为真实 ID。
+把 D1 database ID 作为 GitHub Secrets（见下一步），**不要**直接写到 `wrangler.toml` 里。`wrangler.toml` 中已预留占位符 `PLACEHOLDER_D1_ID`，部署时 GitHub Actions 会自动替换为真实 ID。
 
 ---
 
@@ -97,7 +95,6 @@ wrangler kv namespace create PRICE_CACHE
 | `CF_ACCOUNT_ID` | ✅ | Cloudflare 控制台右侧 Account ID |
 | `CF_API_TOKEN` | ✅ | [创建](https://dash.cloudflare.com/profile/api-tokens) → 模板「Edit Cloudflare Workers」 |
 | `CF_D1_DATABASE_ID` | ✅ | 第 2 步 `wrangler d1 create portfolio-db` 输出的 `database_id` |
-| `CF_KV_NAMESPACE_ID` | ✅ | 第 2 步 `wrangler kv namespace create PRICE_CACHE` 输出的 `id` |
 | `JWT_SECRET` | ✅ | session 签名。`openssl rand -hex 32` 生成 |
 | `CRON_SECRET` | ✅ | cron 接口鉴权。`openssl rand -hex 32` 生成 |
 | `WORKER_HOST` | ✅ | 你的 Worker 域名（**不带** `https://`），如 `portfolio.yourdomain.com` 或 `portfolio-tracker.your-account.workers.dev` |
@@ -135,7 +132,7 @@ git push origin master
 
 ### 第 6 步：seed 一次行情数据（首次部署必须）
 
-刚部署时 KV 缓存、汇率表、daily snapshot 表都是空的。手动跑一次 cron workflow：
+刚部署时 D1 数据表、汇率表、daily snapshot 表都是空的。手动跑一次 cron workflow：
 
 仓库 → Actions → Cron Jobs (Manual Only) → Run workflow → job 选 `all` → Run。
 
@@ -155,8 +152,8 @@ git push origin master
 
 ```bash
 npm install --legacy-peer-deps
-npm run dev        # Next.js dev server（无 D1/KV）
-npx wrangler dev   # 含 D1/KV 的完整本地环境（更接近生产）
+npm run dev        # Next.js dev server（无 D1）
+npx wrangler dev   # 含 D1 的完整本地环境（更接近生产）
 ```
 
 ---
@@ -213,16 +210,16 @@ npx wrangler dev   # 含 D1/KV 的完整本地环境（更接近生产）
 ## 常见问题
 
 **部署后日股 / 韩股 / 欧股价格不显示**
-等下一次 Workers Cron Trigger 跑完 `price-fetch`（每 30 分钟一次），KV 缓存会被填充。或去 Cloudflare Dashboard → Workers → portfolio-tracker → Logs 确认 cron 是否已触发。
+等下一次 Workers Cron Trigger 跑完 `price-fetch`（每 30 分钟一次），D1 `assets.last_price` 会被填充。或去 Cloudflare Dashboard → Workers → portfolio-tracker → Logs 确认 cron 是否已触发。
 
 **净值曲线 / 盈亏走势是空白的**
 需要至少一天的 daily snapshot 数据。第一次部署后手动 Run workflow → snapshot 立即拍一次，之后每天 08:00 UTC 自动累积。
 
 **今日盈亏卡显示"等待行情数据"**
-没有持仓的 `prevClose` 字段。原因可能是：(1) KV 缓存还没更新（手动跑一次 price-fetch），(2) 行情源没返回 prevClose（部分行情源对部分市场不返回，这是正常的，会随源切换自动恢复）。
+没有持仓的 `prevClose` 字段。原因可能是：(1) D1 价格还没更新（手动跑一次 price-fetch），(2) 行情源没返回 prevClose（部分行情源对部分市场不返回，这是正常的，会随源切换自动恢复）。
 
 **部署后 API 返回 500 / Internal Server Error**
-- 检查 `wrangler.toml` 的 `database_id` 和 KV `id` 是否正确
+- 检查 `wrangler.toml` 的 `database_id` 是否正确
 - `JWT_SECRET` 未设置 → API 会因 secret key 缺失全部 500
 - `wrangler tail` 看实时日志
 
@@ -260,7 +257,7 @@ src/
 │   └── stock-names.ts     # 美股代码 → 中文名映射
 ├── middleware.ts          # API 路径鉴权
 └── types/
-    └── cloudflare.d.ts    # D1 / KV 类型补丁
+    └── cloudflare.d.ts    # D1 类型补丁
 ```
 
 ---
