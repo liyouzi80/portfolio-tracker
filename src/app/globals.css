@@ -214,8 +214,8 @@ html:not(.dark) .bg-zinc-950,
 html:not(.dark) .bg-zinc-950\/95,
 html:not(.dark) .bg-zinc-950\/\[0\.02\] { background: #fff; }
 html:not(.dark) .bg-zinc-900,
-html:not(.dark) .bg-zinc-900\/80,
-html:not(.dark) .bg-zinc-900\/50 { background: #f4f4f5; }
+html:not(.dark) .bg-zinc-900\/50 { background: rgba(244,244,245,0.5); }
+html:not(.dark) .bg-zinc-900\/80 { background: rgba(244,244,245,0.8); }
 html:not(.dark) .bg-zinc-950\/\[0\.02\] { background: #fafafa; }
 html:not(.dark) .bg-zinc-800 { background: #e4e4e7; }
 html:not(.dark) .bg-white\/\[0\.02\] { background: #fafafa; }
@@ -226,6 +226,7 @@ html:not(.dark) .bg-black\/30,
 html:not(.dark) .bg-black\/45 { background: rgb(255 255 255 / 0.6); }
 
 html:not(.dark) .text-zinc-100 { color: #18181b; }
+html:not(.dark) .text-zinc-200 { color: #27272a; }
 html:not(.dark) .text-zinc-300 { color: #3f3f46; }
 html:not(.dark) .text-zinc-400 { color: #52525b; }
 html:not(.dark) .text-zinc-500 { color: #71717a; }
