@@ -32,7 +32,7 @@ export function ChartContainer({
         vertLine: { color: "rgba(63,63,70,0.4)", width: 1, style: 2 },
         horzLine: { color: "rgba(63,63,70,0.4)", width: 1, style: 2 },
       },
-      rightPriceScale: { borderColor: "rgba(63,63,70,0.3)", visible: false },
+      rightPriceScale: { borderColor: "rgba(63,63,70,0.3)", visible: true, entireTextOnly: true },
       timeScale: {
         borderColor: "rgba(63,63,70,0.3)",
         timeVisible: false,
