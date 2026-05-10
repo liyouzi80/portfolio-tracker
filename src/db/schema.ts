@@ -30,10 +30,8 @@ export const transactions = sqliteTable("transactions", {
   accountId: text("account_id")
     .notNull()
     .references(() => accounts.id),
-  assetId: text("asset_id")
-    .notNull()
-    .references(() => assets.id),
-  type: text("type").notNull(), // buy, sell, dividend, split
+  assetId: text("asset_id").references(() => assets.id),
+  type: text("type").notNull(), // buy, sell, dividend, split, deposit, withdrawal
   quantity: real("quantity").notNull(),
   price: real("price").notNull(),
   fee: real("fee").default(0),

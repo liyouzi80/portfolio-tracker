@@ -155,21 +155,24 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
         return;
       }
 
-      const currency = marketCurrency[t.market] || "USD";
-      // Ensure asset exists
-      const assetRes = await fetch("/api/assets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ symbol: t.symbol.toUpperCase(), name: t.symbol.toUpperCase(), market: t.market, currency, assetType: "stock" }),
-      });
-      const assetData = await assetRes.json() as { id?: string };
-      if (!assetData.id) throw new Error("Failed to create asset");
+      const isCashTxn = t.type === "deposit" || t.type === "withdrawal";
+      const assetId = isCashTxn ? null : await (async () => {
+        const currency = marketCurrency[t.market] || "USD";
+        const assetRes = await fetch("/api/assets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ symbol: t.symbol.toUpperCase(), name: t.symbol.toUpperCase(), market: t.market, currency, assetType: "stock" }),
+        });
+        const assetData = await assetRes.json() as { id?: string };
+        if (!assetData.id) throw new Error("Failed to create asset");
+        return assetData.id;
+      })();
 
       // Create transaction
       const res = await fetch("/api/transactions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accountId: t.accountId, assetId: assetData.id, type: t.type, quantity: t.quantity, price: t.price, fee: t.fee, date: t.date }),
+        body: JSON.stringify({ accountId: t.accountId, assetId, type: t.type, quantity: t.quantity, price: t.price, fee: t.fee, date: t.date }),
       });
       const data = await res.json() as { id?: string; error?: string };
       if (data.id) {

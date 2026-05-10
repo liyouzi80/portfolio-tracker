@@ -42,12 +42,20 @@ async function txHash(body: { accountId: string; assetId: string; type: string; 
 
 export async function POST(req: NextRequest) {
   const { DB: d1 } = getPlatformEnv();
-  const body = await req.json() as { accountId: string; assetId: string; type: string; quantity: number; price: number; fee?: number; date: string; notes?: string };
+  const body = await req.json() as { accountId: string; assetId?: string | null; type: string; quantity: number; price: number; fee?: number; date: string; notes?: string };
 
   // Ensure tx_hash column exists
   try { await d1.prepare("ALTER TABLE transactions ADD COLUMN tx_hash TEXT").run(); } catch { /* exists */ }
 
-  const hash = await txHash(body);
+  // Deposit / withdrawal: force price=1, fee=0, no asset
+  const isCashTxn = body.type === "deposit" || body.type === "withdrawal";
+  if (isCashTxn) {
+    body.price = 1;
+    body.fee = 0;
+    body.assetId = null;
+  }
+
+  const hash = await txHash({ accountId: body.accountId, assetId: body.assetId ?? "", type: body.type, quantity: body.quantity, price: body.price, fee: body.fee ?? 0, date: body.date });
 
   // Check for duplicate
   const existing = await d1.prepare("SELECT id FROM transactions WHERE tx_hash = ?").bind(hash).first<{ id: string }>();
@@ -57,7 +65,7 @@ export async function POST(req: NextRequest) {
   const now = new Date().toISOString();
   await d1.prepare(
     "INSERT INTO transactions (id, account_id, asset_id, type, quantity, price, fee, date, notes, tx_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-  ).bind(id, body.accountId, body.assetId, body.type, body.quantity, body.price, body.fee ?? 0, body.date, body.notes || null, hash, now).run();
+  ).bind(id, body.accountId, body.assetId ?? null, body.type, body.quantity, body.price, body.fee ?? 0, body.date, body.notes || null, hash, now).run();
 
   return NextResponse.json({ id });
 }

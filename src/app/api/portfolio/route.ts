@@ -38,6 +38,7 @@ interface AccountSummary {
   tradingPnl?: number;
   dividendIncome?: number;
   unrealizedPnl?: number;
+  cashBalance: number;
   holdings: Holding[];
 }
 
@@ -106,15 +107,29 @@ export async function GET(req: NextRequest) {
     let realizedPnl = 0;
     let tradingPnl = 0;
     let dividendIncome = 0;
+    let cashBalance = 0;
 
     for (const row of txns) {
       const txn = row.transactions;
       const asset = row.assets;
+
+      // Cash transactions: deposit / withdrawal has no associated asset
+      if (txn.type === "deposit") {
+        cashBalance += txn.quantity * txn.price;
+        continue;
+      }
+      if (txn.type === "withdrawal") {
+        cashBalance -= txn.quantity * txn.price;
+        continue;
+      }
+
       if (!asset) continue;
 
       // Dividend: realized cash inflow, no quantity impact
       if (txn.type === "dividend") {
-        const divInAccCcy = (txn.quantity * txn.price) * getRate(asset.currency, acc.currency);
+        const divAmount = txn.quantity * txn.price;
+        cashBalance += divAmount;
+        const divInAccCcy = divAmount * getRate(asset.currency, acc.currency);
         realizedPnl += divInAccCcy;
         dividendIncome += divInAccCcy;
         continue;
@@ -134,10 +149,12 @@ export async function GET(req: NextRequest) {
       };
 
       if (txn.type === "buy") {
+        cashBalance -= txn.quantity * txn.price + (txn.fee ?? 0);
         existing.quantity += txn.quantity;
         existing.totalCost += txn.quantity * txn.price + (txn.fee ?? 0);
         existing.totalFee += txn.fee ?? 0;
       } else if (txn.type === "sell") {
+        cashBalance += txn.quantity * txn.price - (txn.fee ?? 0);
         const avgCost = existing.quantity > 0 ? existing.totalCost / existing.quantity : 0;
         const sellValue = txn.quantity * txn.price - (txn.fee ?? 0);
         const costBasis = txn.quantity * avgCost;
@@ -377,6 +394,7 @@ export async function GET(req: NextRequest) {
       tradingPnl: Math.round(tradingPnl * 100) / 100,
       dividendIncome: Math.round(dividendIncome * 100) / 100,
       unrealizedPnl: Math.round(unrealizedPnl * 100) / 100,
+      cashBalance: Math.round(cashBalance * 100) / 100,
       holdings,
     });
   }
@@ -388,10 +406,15 @@ export async function GET(req: NextRequest) {
     const r = getRate(a.currency, baseCurrency);
     return r === 0 && a.currency !== baseCurrency ? s : s + a.totalCost * r;
   }, 0);
-  const portfolioMarketValue = accountSummaries.reduce((s, a) => {
+  const holdingsMarketValue = accountSummaries.reduce((s, a) => {
     const r = getRate(a.currency, baseCurrency);
     return r === 0 && a.currency !== baseCurrency ? s : s + (a.totalMarketValue ?? a.totalCost) * r;
   }, 0);
+  const totalCash = accountSummaries.reduce((s, a) => {
+    const r = getRate(a.currency, baseCurrency);
+    return r === 0 && a.currency !== baseCurrency ? s : s + (a.cashBalance ?? 0) * r;
+  }, 0);
+  const portfolioMarketValue = holdingsMarketValue + totalCash;
   const portfolioTotalPnl = accountSummaries.reduce((s, a) => {
     const r = getRate(a.currency, baseCurrency);
     return r === 0 && a.currency !== baseCurrency ? s : s + (a.totalPnl ?? 0) * r;
@@ -434,9 +457,23 @@ export async function GET(req: NextRequest) {
     const trackMap = new Map<string, { qty: number; cost: number; currency: string }>();
     const dateDelta = new Map<string, number>(); // base-currency cost change per date
 
+    // Pre-build account currency map for deposit/withdrawal rate conversion
+    const accCurrencyMap = new Map(accountsList.map(a => [a.id, a.currency]));
+
     for (const row of allTxns) {
       const txn = row.transactions;
       const asset = row.assets;
+
+      // Deposit / withdrawal only affects net invested, no holding tracking needed
+      if (txn.type === "deposit" || txn.type === "withdrawal") {
+        const accCurrency = accCurrencyMap.get(txn.accountId) ?? baseCurrency;
+        const rate = getRate(accCurrency, baseCurrency);
+        const amount = txn.quantity * txn.price;
+        const delta = txn.type === "deposit" ? amount * rate : -amount * rate;
+        dateDelta.set(txn.date, (dateDelta.get(txn.date) ?? 0) + delta);
+        continue;
+      }
+
       if (!asset) continue;
       const k = `${txn.accountId}:${asset.id}`;
       const t = trackMap.get(k) ?? { qty: 0, cost: 0, currency: asset.currency };
@@ -506,6 +543,8 @@ export async function GET(req: NextRequest) {
     baseCurrency,
     totalValue: Math.round(portfolioCost * 100) / 100,
     totalMarketValue: Math.round(portfolioMarketValue * 100) / 100,
+    holdingsMarketValue: Math.round(holdingsMarketValue * 100) / 100,
+    totalCash: Math.round(totalCash * 100) / 100,
     totalPnl: Math.round(portfolioTotalPnl * 100) / 100,
     todayPnl: Math.round(portfolioTodayPnl * 100) / 100,
     realizedPnl: Math.round(portfolioRealizedPnl * 100) / 100,

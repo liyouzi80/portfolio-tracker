@@ -50,6 +50,8 @@ const typeOptions = [
   { value: "buy", label: "买入", icon: ArrowUpRight, color: "text-emerald-400" },
   { value: "sell", label: "卖出", icon: ArrowDownRight, color: "text-red-400" },
   { value: "dividend", label: "股息", icon: Wallet, color: "text-blue-400" },
+  { value: "deposit", label: "入金", icon: ArrowUpRight, color: "text-amber-400" },
+  { value: "withdrawal", label: "出金", icon: ArrowDownRight, color: "text-orange-400" },
 ];
 
 const marketCurrency: Record<string, string> = {
@@ -184,17 +186,17 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
   };
 
   const handleSaveAndContinue = async () => {
-    if (!form.accountId || !form.symbol || !form.quantity || !form.price || submitting) return;
+    if (!isValid || submitting) return;
     setSubmitting(true);
     await onSave({
       id: editTxn?.id,
       accountId: form.accountId,
-      symbol: form.symbol.toUpperCase(),
-      market: form.market,
+      symbol: isCashType ? "_CASH" : form.symbol.toUpperCase(),
+      market: isCashType ? "CASH" : form.market,
       type: form.type,
       quantity: parseFloat(form.quantity),
-      price: parseFloat(form.price),
-      fee: parseFloat(form.fee || "0"),
+      price: isCashType ? 1 : parseFloat(form.price),
+      fee: isCashType ? 0 : parseFloat(form.fee || "0"),
       date: form.date,
     });
     setSubmitting(false);
@@ -202,16 +204,19 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
     if (!editTxn) resetFormForContinue();
   };
 
+  const isCashType = form.type === "deposit" || form.type === "withdrawal";
   const qty = parseFloat(form.quantity);
-  const prc = parseFloat(form.price);
-  const fee = parseFloat(form.fee || "0");
-  const isValid = !!(
-    form.accountId &&
-    form.symbol &&
-    !isNaN(qty) && qty > 0 &&
-    !isNaN(prc) && prc > 0 &&
-    (isNaN(fee) || fee >= 0)
-  );
+  const prc = isCashType ? 1 : parseFloat(form.price);
+  const fee = isCashType ? 0 : parseFloat(form.fee || "0");
+  const isValid = isCashType
+    ? !!(form.accountId && !isNaN(qty) && qty > 0)
+    : !!(
+      form.accountId &&
+      form.symbol &&
+      !isNaN(qty) && qty > 0 &&
+      !isNaN(prc) && prc > 0 &&
+      (isNaN(fee) || fee >= 0)
+    );
   const estimatedTotal = form.quantity && form.price
     ? (qty * prc + (isNaN(fee) ? 0 : fee)).toFixed(2)
     : "";
@@ -262,7 +267,8 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
               </Select>
             </div>
 
-            {/* Symbol search */}
+            {/* Symbol search — hidden for cash transactions */}
+            {!isCashType && (
             <div className="space-y-2">
               <Label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">代码或名称</Label>
               <div className="relative">
@@ -305,6 +311,7 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
                 </div>
               )}
             </div>
+            )}
 
             {/* Type */}
             <div className="space-y-2">
@@ -332,9 +339,11 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
             </div>
 
             {/* Quantity + Price */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className={`grid ${isCashType ? "grid-cols-1" : "grid-cols-2"} gap-3`}>
               <div className="space-y-2">
-                <Label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">数量</Label>
+                <Label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">
+                  {isCashType ? "金额" : "数量"}
+                </Label>
                 <Input
                   value={form.quantity}
                   onChange={(e) => setForm({ ...form, quantity: e.target.value })}
@@ -345,6 +354,7 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
                   placeholder="0"
                 />
               </div>
+              {!isCashType && (
               <div className="space-y-2">
                 <Label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">
                   价格
@@ -359,10 +369,12 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
                   placeholder="0.00"
                 />
               </div>
+              )}
             </div>
 
             {/* Fee + Date */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className={`grid ${isCashType ? "grid-cols-1" : "grid-cols-2"} gap-3`}>
+              {!isCashType && (
               <div className="space-y-2">
                 <Label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">手续费</Label>
                 <Input
@@ -375,6 +387,7 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
                   placeholder="0"
                 />
               </div>
+              )}
               <div className="space-y-2">
                 <Label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">日期</Label>
                 <div className="relative">
@@ -390,7 +403,19 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
             </div>
 
             {/* Estimated total */}
-            {estimatedTotal !== "" && (
+            {isCashType ? (
+              <div className="flex items-center justify-between px-4 py-3 rounded-lg bg-zinc-900/50 border border-zinc-800">
+                <span className="text-sm text-zinc-400">
+                  {form.type === "deposit" ? "入金金额" : "出金金额"}
+                </span>
+                <div className="text-right">
+                  <span className="text-sm font-mono font-semibold">
+                    <TypeIcon className={`h-3.5 w-3.5 inline mr-1 ${selectedType?.color}`} />
+                    {selectedAccount?.currency ?? ""} {qty ? qty.toLocaleString() : "--"}
+                  </span>
+                </div>
+              </div>
+            ) : estimatedTotal !== "" ? (
               <div className="flex items-center justify-between px-4 py-3 rounded-lg bg-zinc-900/50 border border-zinc-800">
                 <span className="text-sm text-zinc-400">
                   预估总额
@@ -403,7 +428,7 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
                   </span>
                 </div>
               </div>
-            )}
+            ) : null}
 
             {/* Buttons */}
             <div className="flex gap-2 pt-2">
@@ -418,7 +443,10 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
             </div>
             {!isValid && (
               <p className="text-xs text-amber-400/80 text-center">
-                请填写: {[
+                请填写: {isCashType ? [
+                  !form.accountId && "账户",
+                  !form.quantity && "金额",
+                ].filter(Boolean).join("、") : [
                   !form.accountId && "账户",
                   !form.symbol && "代码",
                   !form.quantity && "数量",
