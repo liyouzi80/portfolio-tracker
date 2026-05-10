@@ -29,11 +29,13 @@ interface Txn {
 }
 interface Account { id: string; name: string; currency: string }
 
-const typeLabels: Record<string, string> = { buy: "买入", sell: "卖出", dividend: "股息" };
+const typeLabels: Record<string, string> = { buy: "买入", sell: "卖出", dividend: "股息", deposit: "入金", withdrawal: "出金" };
 const typeColors: Record<string, string> = {
   buy: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
   sell: "bg-red-500/10 text-red-400 border-red-500/20",
   dividend: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  deposit: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  withdrawal: "bg-orange-500/10 text-orange-400 border-orange-500/20",
 };
 
 export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenSheet?: boolean; onSheetClosed?: () => void }) {
