@@ -5,10 +5,12 @@ import { getPlatformEnv } from "@/lib/env";
 import { fetchTencentPrices, fetchLongbridgePrices, fetchFinnhubPrice, fetchYahooQuote } from "@/lib/price";
 import { getChineseName } from "@/lib/stock-names";
 import { eq } from "drizzle-orm";
+import { cuid } from "@/lib/cuid";
 
 let migrationsRun = false;
 
 export async function GET(req: NextRequest) {
+  const startTime = Date.now();
   const env = getPlatformEnv() as unknown as Record<string, string | undefined>;
   const cronSecret = env?.CRON_SECRET;
   if (cronSecret && req.nextUrl.searchParams.get("secret") !== cronSecret) {
@@ -23,6 +25,7 @@ export async function GET(req: NextRequest) {
     try { await d1.prepare("ALTER TABLE assets ADD COLUMN last_price REAL").run(); } catch { /* exists */ }
     try { await d1.prepare("ALTER TABLE assets ADD COLUMN last_price_updated_at TEXT").run(); } catch { /* exists */ }
     try { await d1.prepare("ALTER TABLE assets ADD COLUMN last_prev_close REAL").run(); } catch { /* exists */ }
+    try { await d1.prepare("CREATE TABLE IF NOT EXISTS cron_runs (id TEXT PRIMARY KEY, trigger_type TEXT NOT NULL, status TEXT NOT NULL, succeeded INTEGER DEFAULT 0, failed INTEGER DEFAULT 0, duration_ms INTEGER DEFAULT 0, error_message TEXT, started_at TEXT NOT NULL)").run(); } catch { /* exists */ }
     migrationsRun = true;
   }
 
@@ -147,5 +150,18 @@ export async function GET(req: NextRequest) {
   }
 
   await Promise.all(pendingWrites);
+
+  const succeeded = results.filter(r => r.price !== null).length;
+  const failed = results.filter(r => r.price === null).length;
+  await d1.prepare(
+    "INSERT INTO cron_runs (id, trigger_type, status, succeeded, failed, duration_ms, started_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+  ).bind(
+    cuid(), "price-fetch",
+    failed === 0 ? "success" : "failed",
+    succeeded, failed,
+    Date.now() - startTime,
+    new Date(startTime).toISOString()
+  ).run().catch(() => {});
+
   return NextResponse.json({ updated: results.filter(r => r.price !== null).length, total: results.length, results });
 }

@@ -2,7 +2,7 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, AlertTriangle } from "lucide-react";
 import { fmtMoney, fmtQuantity, fmtMoneySigned, fmtPercent } from "@/lib/format";
 
 interface Holding {
@@ -15,8 +15,10 @@ interface Holding {
   avgCost: number;
   totalCost: number;
   currentPrice?: number;
+  prevClose?: number;
   pnl?: number;
   pnlPct?: number;
+  priceUpdatedAt?: number;
 }
 
 const marketLabels: Record<string, string> = { US: "美股", HK: "港股", CN: "A股", JP: "日股", KR: "韩股", GB: "英股", DE: "德股", CH: "瑞士", CA: "加股", AU: "澳股", TW: "台股", IN: "印度" };
@@ -57,8 +59,8 @@ function tradingViewUrl(symbol: string, market: string): string {
 
 export function HoldingsTable({ data, onSymbolClick }: { data: Holding[]; onSymbolClick?: (symbol: string) => void }) {
   return (
-    <div className="overflow-auto max-h-[60vh] md:max-h-[600px]"><Table>
-      <TableHeader className="sticky top-0 z-10 bg-zinc-950/95 backdrop-blur-sm">
+    <div className="md:overflow-auto md:max-h-[600px] overflow-x-auto"><Table>
+      <TableHeader className="md:sticky md:top-0 md:z-10 md:bg-zinc-950/95 md:backdrop-blur-sm">
         <TableRow className="border-zinc-800 hover:bg-transparent">
           <TableHead className="text-zinc-400">代码</TableHead>
           <TableHead className="text-zinc-400">名称</TableHead>
@@ -75,11 +77,28 @@ export function HoldingsTable({ data, onSymbolClick }: { data: Holding[]; onSymb
         {data.map((h) => (
           <TableRow key={h.assetId} className="border-zinc-800">
             <TableCell className="font-mono font-medium text-zinc-100">
-              {onSymbolClick ? (
-                <button onClick={() => onSymbolClick(h.symbol)} className="hover:text-emerald-400 transition-colors cursor-pointer">
-                  {h.symbol}
-                </button>
-              ) : h.symbol}
+              <div className="flex items-center gap-1.5">
+                {(!h.priceUpdatedAt || Date.now() - h.priceUpdatedAt > 7 * 24 * 60 * 60 * 1000) && (
+                  <AlertTriangle
+                    className="h-3.5 w-3.5 text-red-400 shrink-0"
+                    aria-label="价格数据过期"
+                  />
+                )}
+                {onSymbolClick ? (
+                  <button onClick={() => onSymbolClick(h.symbol)} className="hover:text-emerald-400 transition-colors cursor-pointer">
+                    {h.symbol}
+                  </button>
+                ) : (
+                  <a
+                    href={tradingViewUrl(h.symbol, h.market)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-amber-400 transition-colors"
+                  >
+                    {h.symbol}
+                  </a>
+                )}
+              </div>
             </TableCell>
             <TableCell className="text-zinc-300">{h.name || h.symbol}</TableCell>
             <TableCell>

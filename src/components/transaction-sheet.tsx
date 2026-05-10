@@ -26,12 +26,24 @@ interface EditTxnInput {
   date: string;
 }
 
+interface CloneTxnInput {
+  accountId: string;
+  symbol: string;
+  market: string;
+  type: string;
+  quantity: number;
+  price: number;
+  fee: number;
+  name?: string;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   accounts: Account[];
   onSave: (txn: { accountId: string; symbol: string; market: string; type: string; quantity: number; price: number; fee: number; date: string; id?: string }) => void;
   editTxn?: EditTxnInput | null;
+  cloneFrom?: CloneTxnInput | null;
 }
 
 const typeOptions = [
@@ -62,7 +74,7 @@ const defaultForm = {
   date: todayStr(),
 };
 
-export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn }: Props) {
+export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn, cloneFrom }: Props) {
   const [form, setForm] = useState(defaultForm);
   const [symbolName, setSymbolName] = useState("");
   const [lookingUp, setLookingUp] = useState(false);
@@ -74,24 +86,38 @@ export function TransactionSheet({ open, onOpenChange, accounts, onSave, editTxn
 
   // Populate form when editing
   useEffect(() => {
-    if (open && editTxn) {
-      setForm({
-        accountId: editTxn.accountId || "",
-        symbol: editTxn.symbol,
-        market: editTxn.market,
-        type: editTxn.type,
-        quantity: String(editTxn.quantity),
-        price: String(editTxn.price),
-        fee: String(editTxn.fee || ""),
-        date: editTxn.date,
-      });
-      setSymbolName(editTxn.symbol);
-    } else if (open && !editTxn) {
-      // For new transactions, keep account/date stickiness across "save and continue"
-      setForm((f) => ({ ...defaultForm, accountId: f.accountId, date: f.date || todayStr() }));
-      setSymbolName("");
+    if (open) {
+      if (editTxn) {
+        setForm({
+          accountId: editTxn.accountId || "",
+          symbol: editTxn.symbol,
+          market: editTxn.market,
+          type: editTxn.type,
+          quantity: String(editTxn.quantity),
+          price: String(editTxn.price),
+          fee: String(editTxn.fee || ""),
+          date: editTxn.date,
+        });
+        setSymbolName(editTxn.symbol);
+      } else if (cloneFrom) {
+        setForm({
+          accountId: cloneFrom.accountId,
+          symbol: cloneFrom.symbol,
+          market: cloneFrom.market,
+          type: cloneFrom.type,
+          quantity: cloneFrom.quantity.toString(),
+          price: cloneFrom.price.toString(),
+          fee: (cloneFrom.fee ?? 0).toString(),
+          date: new Date().toISOString().slice(0, 10),
+        });
+        setSymbolName(cloneFrom.name || "");
+      } else {
+        // For new transactions, keep account/date stickiness across "save and continue"
+        setForm((f) => ({ ...defaultForm, accountId: f.accountId, date: f.date || todayStr() }));
+        setSymbolName("");
+      }
     }
-  }, [open, editTxn]);
+  }, [open, editTxn, cloneFrom]);
 
   interface SearchResult { symbol: string; fullSymbol: string; name: string; exchange: string; market: string; currency: string; marketLabel: string; price?: number | null }
 

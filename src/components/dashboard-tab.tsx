@@ -135,7 +135,10 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
   const marketCount = markets.size;
   const pnlPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
   const todayPnlPct = totalMarketValue > 0 ? (todayPnl / (totalMarketValue - todayPnl)) * 100 : 0;
-  const hasPrices = data.holdings.some(h => h.prevClose);
+  const withPrev = data.holdings.filter(h => h.prevClose).length;
+  const totalHold = data.holdings.length;
+  const hasPrices = withPrev > 0;
+  const partialPrices = withPrev < totalHold;
 
   const allocationMap = new Map<string, number>();
   for (const h of data.holdings) {
@@ -159,7 +162,7 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
           sentiment="neutral" delay={1} />
         <MetricCard label="今日盈亏" icon={todayPnl >= 0 ? TrendingUp : TrendingDown}
           value={hasPrices ? fmtMoney(todayPnl, cs) : "--"}
-          sub={hasPrices ? `${todayPnlPct >= 0 ? "+" : ""}${todayPnlPct.toFixed(2)}%` : "等待行情数据"}
+          sub={hasPrices ? `${todayPnlPct >= 0 ? "+" : ""}${todayPnlPct.toFixed(2)}%${partialPrices ? ` (${withPrev}/${totalHold})` : ""}` : "等待行情数据"}
           sentiment={todayPnl > 0 ? "up" : todayPnl < 0 ? "down" : "neutral"} delay={2} />
         <MetricCard label="累计盈亏" icon={PiggyBank}
           value={fmtMoney(totalPnl, cs)}

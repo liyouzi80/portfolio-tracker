@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { TransactionSheet } from "./transaction-sheet";
 import { ImportSheet } from "./import-sheet";
-import { Plus, Upload, Search, Trash2, Loader2, Pencil } from "lucide-react";
+import { Plus, Upload, Search, Trash2, Loader2, Pencil, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { fmtMoney, fmtQuantity } from "@/lib/format";
 
@@ -45,6 +45,7 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [editTxn, setEditTxn] = useState<{ id: string; accountId: string; symbol: string; market: string; type: string; quantity: number; price: number; fee: number; date: string } | null>(null);
+  const [cloneFrom, setCloneFrom] = useState<Txn | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
   const loadTxns = useCallback(async () => {
@@ -105,7 +106,7 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
 
   const handleSheetChange = (v: boolean) => {
     setSheetOpen(v);
-    if (!v) { onSheetClosed?.(); setEditTxn(null); }
+    if (!v) { onSheetClosed?.(); setEditTxn(null); setCloneFrom(null); }
   };
 
   const handleDelete = async (id: string) => {
@@ -244,8 +245,8 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
             <Loader2 className="h-6 w-6 text-zinc-400 animate-spin" />
           </div>
         ) : (
-          <div className="overflow-auto max-h-[60vh] md:max-h-[70vh]"><Table>
-            <TableHeader className="sticky top-0 z-10 bg-zinc-950/95 backdrop-blur-sm">
+          <div className="md:overflow-auto md:max-h-[70vh] overflow-x-auto"><Table>
+            <TableHeader className="md:sticky md:top-0 md:z-10 md:bg-zinc-950/95 md:backdrop-blur-sm">
               <TableRow className="border-zinc-800 hover:bg-transparent">
                 <TableHead className="text-zinc-400">日期</TableHead>
                 <TableHead className="text-zinc-400">账户</TableHead>
@@ -290,6 +291,15 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-7 w-7 text-zinc-500 hover:text-zinc-300"
+                        onClick={() => { setEditTxn(null); setCloneFrom(t); setSheetOpen(true); }}
+                        title="复制此交易"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-7 w-7 text-zinc-400 hover:text-red-400"
                         disabled={deleting === t.id}
                         onClick={() => handleDelete(t.id)}
@@ -316,7 +326,7 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
         )}
       </CardContent>
 
-      <TransactionSheet open={sheetOpen} onOpenChange={(v) => { handleSheetChange(v); if (!v) loadTxns(); }} accounts={accounts} onSave={handleSaveTxn} editTxn={editTxn} />
+      <TransactionSheet open={sheetOpen} onOpenChange={(v) => { handleSheetChange(v); if (!v) loadTxns(); }} accounts={accounts} onSave={handleSaveTxn} editTxn={editTxn} cloneFrom={cloneFrom} />
       <ImportSheet open={importOpen} onOpenChange={setImportOpen} accounts={accounts} onDone={handleImportDone} />
     </Card>
   );

@@ -65,6 +65,17 @@ export const dailySnapshots = sqliteTable("daily_snapshots", {
   createdAt: text("created_at").notNull(),
 });
 
+export const cronRuns = sqliteTable("cron_runs", {
+  id: text("id").primaryKey(),
+  triggerType: text("trigger_type").notNull(),
+  status: text("status").notNull(),
+  succeeded: integer("succeeded").default(0),
+  failed: integer("failed").default(0),
+  durationMs: integer("duration_ms").default(0),
+  errorMessage: text("error_message"),
+  startedAt: text("started_at").notNull(),
+});
+
 export const exchangeRates = sqliteTable("exchange_rates", {
   fromCurrency: text("from_currency").notNull(),
   toCurrency: text("to_currency").notNull(),

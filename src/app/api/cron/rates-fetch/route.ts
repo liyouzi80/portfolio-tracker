@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPlatformEnv } from "@/lib/env";
+import { cuid } from "@/lib/cuid";
 
 const API_URL = "https://api.exchangerate-api.com/v4/latest/USD";
 
@@ -18,7 +19,10 @@ async function fetchWithRetry(url: string, retries = 3): Promise<Response> {
   throw new Error("Unreachable");
 }
 
+let migrationsRun = false;
+
 export async function GET(req: NextRequest) {
+  const startTime = Date.now();
   const env = getPlatformEnv() as unknown as Record<string, string | undefined>;
   const cronSecret = env?.CRON_SECRET;
   if (cronSecret && req.nextUrl.searchParams.get("secret") !== cronSecret) {
@@ -26,6 +30,11 @@ export async function GET(req: NextRequest) {
   }
 
   const { DB: d1 } = getPlatformEnv();
+
+  if (!migrationsRun) {
+    try { await d1.prepare("CREATE TABLE IF NOT EXISTS cron_runs (id TEXT PRIMARY KEY, trigger_type TEXT NOT NULL, status TEXT NOT NULL, succeeded INTEGER DEFAULT 0, failed INTEGER DEFAULT 0, duration_ms INTEGER DEFAULT 0, error_message TEXT, started_at TEXT NOT NULL)").run(); } catch { /* exists */ }
+    migrationsRun = true;
+  }
 
   try {
     const res = await fetchWithRetry(API_URL);
@@ -51,8 +60,25 @@ export async function GET(req: NextRequest) {
     }
     await d1.batch(stmts);
 
+    await d1.prepare(
+      "INSERT INTO cron_runs (id, trigger_type, status, succeeded, failed, duration_ms, started_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).bind(
+      cuid(), "rates-fetch", "success", stmts.length, 0,
+      Date.now() - startTime,
+      new Date(startTime).toISOString()
+    ).run().catch(() => {});
+
     return NextResponse.json({ success: true, updated: now, pairs: stmts.length });
-  } catch {
+  } catch (e: any) {
+    await d1.prepare(
+      "INSERT INTO cron_runs (id, trigger_type, status, succeeded, failed, duration_ms, error_message, started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(
+      cuid(), "rates-fetch", "failed", 0, 1,
+      Date.now() - startTime,
+      e?.message || "Failed to fetch rates",
+      new Date(startTime).toISOString()
+    ).run().catch(() => {});
+
     return NextResponse.json({ error: "Failed to fetch rates" }, { status: 500 });
   }
 }

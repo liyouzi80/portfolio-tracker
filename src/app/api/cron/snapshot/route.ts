@@ -9,6 +9,7 @@ import { cuid } from "@/lib/cuid";
 let migrationsRun = false;
 
 export async function GET(req: NextRequest) {
+  const startTime = Date.now();
   const env2 = getPlatformEnv() as unknown as Record<string, string | undefined>;
   const cronSecret = env2?.CRON_SECRET;
   if (cronSecret && req.nextUrl.searchParams.get("secret") !== cronSecret) {
@@ -21,6 +22,7 @@ export async function GET(req: NextRequest) {
 
   if (!migrationsRun) {
     try { await d1.prepare("ALTER TABLE daily_snapshots ADD COLUMN rates TEXT").run(); } catch { /* exists */ }
+    try { await d1.prepare("CREATE TABLE IF NOT EXISTS cron_runs (id TEXT PRIMARY KEY, trigger_type TEXT NOT NULL, status TEXT NOT NULL, succeeded INTEGER DEFAULT 0, failed INTEGER DEFAULT 0, duration_ms INTEGER DEFAULT 0, error_message TEXT, started_at TEXT NOT NULL)").run(); } catch { /* exists */ }
     migrationsRun = true;
   }
 
@@ -174,6 +176,18 @@ export async function GET(req: NextRequest) {
 
     results.push({ account: acc.name, cost: totalCost, marketValue: totalMarketValue });
   }
+
+  const succeeded = results.length;
+  const failed = accountsList.length - results.length;
+  await d1.prepare(
+    "INSERT INTO cron_runs (id, trigger_type, status, succeeded, failed, duration_ms, started_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+  ).bind(
+    cuid(), "snapshot",
+    failed === 0 ? "success" : "failed",
+    succeeded, failed,
+    Date.now() - startTime,
+    new Date(startTime).toISOString()
+  ).run().catch(() => {});
 
   return NextResponse.json({ success: true, date: today, results });
 }

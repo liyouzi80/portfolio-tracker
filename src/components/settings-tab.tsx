@@ -60,6 +60,7 @@ export function SettingsTab() {
   const [testing, setTesting] = useState(false);
   const [registeringPasskey, setRegisteringPasskey] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [cronRuns, setCronRuns] = useState<any[]>([]);
   const [hasPasskey, setHasPasskey] = useState(false);
   const [deletingPasskey, setDeletingPasskey] = useState(false);
   const passkeyAvailable = typeof window !== "undefined" && !!window.PublicKeyCredential;
@@ -91,6 +92,7 @@ export function SettingsTab() {
         setHasPasskey(authData.hasPasskey ?? false);
         if (authData.dataSource) setDataSource(authData.dataSource);
       }
+      fetch("/api/cron-runs").then(r => r.json()).then((d) => setCronRuns(d as any[])).catch(() => {});
     } catch { /* ignore */ }
     setLoading(false);
   }, []);
@@ -484,6 +486,54 @@ export function SettingsTab() {
             <Download className="h-3.5 w-3.5" />
             下载 CSV 备份
           </a>
+        </CardContent>
+      </Card>
+
+      {/* Cron Runs History */}
+      <Card className="t-tab-content t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+        <CardHeader>
+          <CardTitle className="text-sm font-medium text-zinc-100">Cron 运行历史</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {cronRuns.length === 0 ? (
+            <p className="text-zinc-500 text-sm">暂无运行记录</p>
+          ) : (
+            <div className="overflow-x-auto"><Table>
+              <TableHeader>
+                <TableRow className="border-zinc-800">
+                  <TableHead className="text-zinc-500">任务</TableHead>
+                  <TableHead className="text-zinc-500">时间</TableHead>
+                  <TableHead className="text-zinc-500">状态</TableHead>
+                  <TableHead className="text-zinc-500 text-right">成功/失败</TableHead>
+                  <TableHead className="text-zinc-500 text-right">耗时</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {cronRuns.map(r => (
+                  <TableRow key={r.id} className="border-zinc-800">
+                    <TableCell className="font-mono text-zinc-100">{r.triggerType}</TableCell>
+                    <TableCell className="text-zinc-400 text-xs">
+                      {new Date(r.startedAt).toLocaleString(undefined, { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={r.status === "success"
+                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                        : "bg-red-500/10 text-red-400 border-red-500/20"
+                      }>
+                        {r.status === "success" ? "成功" : "失败"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-zinc-100">
+                      {r.succeeded}/{(r.succeeded ?? 0) + (r.failed ?? 0)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-zinc-400">
+                      {((r.durationMs ?? 0) / 1000).toFixed(1)}s
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table></div>
+          )}
         </CardContent>
       </Card>
 

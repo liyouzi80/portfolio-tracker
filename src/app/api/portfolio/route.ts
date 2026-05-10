@@ -251,10 +251,28 @@ export async function GET(req: NextRequest) {
           const fh = await fetchFinnhubPrice(s.symbol, s.market);
           return { s, price: fh?.price ?? null, prevClose: fh?.prevClose, name: fh?.name };
         }));
-        for (const { s, price, prevClose, name } of fhResults) {
+
+        const usFhMissed: typeof usSymbols = [];
+        for (const { s, price, prevClose } of fhResults) {
           if (price) {
             priceCache.set(s.symbol + s.market, { price, prevClose, updatedAt: Date.now() });
             updateD1(s.market, s.symbol, price, prevClose);
+          } else {
+            usFhMissed.push(s);
+          }
+        }
+
+        // Yahoo fallback for Finnhub-missed US assets
+        if (usFhMissed.length > 0) {
+          const yhResults = await Promise.all(usFhMissed.map(async (s) => {
+            const yq = await fetchYahooQuote(s.symbol, s.market);
+            return { s, price: yq?.price ?? null, prevClose: yq?.prevClose };
+          }));
+          for (const { s, price, prevClose } of yhResults) {
+            if (price) {
+              priceCache.set(s.symbol + s.market, { price, prevClose, updatedAt: Date.now() });
+              updateD1(s.market, s.symbol, price, prevClose);
+            }
           }
         }
       }
@@ -277,6 +295,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Compute per-holding P&L (in holding currency and converted)
+    const STALE_MS = 7 * 24 * 60 * 60 * 1000;
     for (const h of holdings) {
       const cached = priceCache.get(h.symbol + h.market);
       let cp = cached?.price;
@@ -289,13 +308,18 @@ export async function GET(req: NextRequest) {
         if (d1Row?.price && d1Row.price > 0) cp = d1Row.price;
       }
 
+      // Always propagate priceUpdatedAt so frontend can show stale warnings
+      if (cached?.updatedAt) {
+        h.priceUpdatedAt = cached.updatedAt;
+      }
+
       const rate = getRate(h.currency, baseCurrency);
       // Skip if cross-currency rate is unavailable (e.g. rates-fetch never ran
       // for this currency pair). A 0 rate would silently zero out the holding.
       const rateMissing = rate === 0 && h.currency !== baseCurrency;
-      if (cp && cp > 0 && !rateMissing) {
+      const isPriceStale = cached?.updatedAt && (Date.now() - cached.updatedAt > STALE_MS);
+      if (cp && cp > 0 && !rateMissing && !isPriceStale) {
         h.currentPrice = cp;
-        h.priceUpdatedAt = cached?.updatedAt;
         h.pnl = Math.round((cp - h.avgCost) * h.quantity * 100) / 100;
         h.pnlPct = h.avgCost > 0 ? Math.round((cp - h.avgCost) / h.avgCost * 10000) / 100 : 0;
         h.pnlInBase = Math.round((cp - h.avgCost) * h.quantity * rate * 100) / 100;
