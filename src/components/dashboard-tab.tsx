@@ -135,7 +135,11 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
   const marketCount = markets.size;
   const pnlPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
   const todayPnlPct = totalMarketValue > 0 ? (todayPnl / (totalMarketValue - todayPnl)) * 100 : 0;
-  const withPrev = data.holdings.filter(h => h.prevClose).length;
+  const isToday = (ts?: number) => {
+    if (!ts) return false;
+    return new Date(ts).toDateString() === new Date().toDateString();
+  };
+  const withPrev = data.holdings.filter(h => h.prevClose && isToday(h.priceUpdatedAt)).length;
   const totalHold = data.holdings.length;
   const hasPrices = withPrev > 0;
   const partialPrices = withPrev < totalHold;

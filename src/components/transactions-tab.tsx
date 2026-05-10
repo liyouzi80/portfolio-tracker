@@ -246,7 +246,7 @@ export function TransactionsTab({ autoOpenSheet, onSheetClosed }: { autoOpenShee
           </div>
         ) : (
           <div className="md:overflow-auto md:max-h-[70vh] overflow-x-auto"><Table>
-            <TableHeader className="md:sticky md:top-0 md:z-10 md:bg-zinc-950/95 md:backdrop-blur-sm">
+            <TableHeader className="bg-zinc-950/95 md:sticky md:top-0 md:z-10 md:backdrop-blur-sm">
               <TableRow className="border-zinc-800 hover:bg-transparent">
                 <TableHead className="text-zinc-400">日期</TableHead>
                 <TableHead className="text-zinc-400">账户</TableHead>
