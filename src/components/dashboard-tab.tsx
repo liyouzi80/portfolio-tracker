@@ -20,12 +20,11 @@ interface ChartPoint { date: string; value: number; }
 interface AccountSummary {
   id: string; name: string; currency: string; leverage?: number; totalCost: number;
   totalMarketValue?: number; totalPnl?: number; realizedPnl?: number; tradingPnl?: number; dividendIncome?: number; unrealizedPnl?: number;
-  cashBalance?: number; holdings: Holding[];
+  holdings: Holding[];
 }
 interface PortfolioData {
   baseCurrency: string; totalValue: number; totalMarketValue?: number; totalPnl?: number;
   todayPnl?: number; realizedPnl?: number; tradingPnl?: number; dividendIncome?: number; unrealizedPnl?: number;
-  holdingsMarketValue?: number; totalCash?: number;
   accounts: AccountSummary[]; holdings: Holding[];
   costSeries?: ChartPoint[]; valueSeries?: ChartPoint[]; pnlSeries?: ChartPoint[];
   chartData?: ChartPoint[]; rates: Record<string, number>;
@@ -126,8 +125,6 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
   const cs = currencySymbols[data.baseCurrency] ?? data.baseCurrency;
   const totalCost = data.totalValue;
   const totalMarketValue = data.totalMarketValue ?? totalCost;
-  const holdingsMarketValue = data.holdingsMarketValue ?? (data.totalMarketValue ?? totalCost);
-  const totalCash = data.totalCash ?? 0;
   const totalPnl = data.totalPnl ?? 0;
   const todayPnl = data.todayPnl ?? 0;
   const realizedPnl = data.realizedPnl ?? 0;
@@ -175,9 +172,7 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <MetricCard label="总市值" icon={Wallet}
           value={`${cs}${totalMarketValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
-          sub={totalCash !== 0
-            ? `持仓 ${cs}${holdingsMarketValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} · 现金 ${cs}${totalCash.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-            : `成本 ${cs}${totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+          sub={`成本 ${cs}${totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
           sentiment="neutral" delay={1} />
         <MetricCard label="今日盈亏" icon={todayPnl >= 0 ? TrendingUp : TrendingDown}
           value={allMarketsClosedOrStale ? "休市" : (hasPrices ? fmtMoney(todayPnl, cs) : "--")}
@@ -225,12 +220,6 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
                   }`}>
                     市值倍率 {((a.totalMarketValue ?? a.totalCost) / a.totalCost).toFixed(2)}x
                     {a.leverage && a.leverage > 1 ? ` / 上限 ${a.leverage}x` : ""}
-                  </div>
-                )}
-                {a.cashBalance !== undefined && a.cashBalance !== 0 && (
-                  <div className="text-[10px] font-mono text-zinc-500 mt-0.5">
-                    现金 {currencySymbols[a.currency] ?? a.currency + " "}{a.cashBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                    {a.cashBalance < 0 && <span className="text-amber-400 ml-1">（含融资借入）</span>}
                   </div>
                 )}
                 <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-white/[0.005] rounded-full blur-md group-hover:bg-white/[0.02] transition-colors duration-500" />

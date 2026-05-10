@@ -85,23 +85,20 @@ export async function GET(req: NextRequest) {
       .orderBy(transactions.date)
       .all();
 
-    // Calculate holdings + cash balance
+    // Calculate holdings
     const holdingsMap = new Map<string, { symbol: string; market: string; currency: string; quantity: number; totalCost: number }>();
-    let cashBalance = 0;
     for (const row of txns) {
       const txn = row.transactions;
       const asset = row.assets;
 
-      if (txn.type === "deposit") { cashBalance += txn.quantity * txn.price; continue; }
-      if (txn.type === "withdrawal") { cashBalance -= txn.quantity * txn.price; continue; }
-      if (txn.type === "dividend") { cashBalance += txn.quantity * txn.price; continue; }
+      // deposit/withdrawal/dividend excluded from holdings
+      if (txn.type === "deposit" || txn.type === "withdrawal" || txn.type === "dividend") continue;
 
       if (!asset) continue;
       const key = asset.id;
       const h = holdingsMap.get(key) ?? { symbol: asset.symbol, market: asset.market, currency: asset.currency, quantity: 0, totalCost: 0 };
-      if (txn.type === "buy") { cashBalance -= txn.quantity * txn.price + (txn.fee ?? 0); h.quantity += txn.quantity; h.totalCost += txn.quantity * txn.price + (txn.fee ?? 0); }
+      if (txn.type === "buy") { h.quantity += txn.quantity; h.totalCost += txn.quantity * txn.price + (txn.fee ?? 0); }
       else if (txn.type === "sell") {
-        cashBalance += txn.quantity * txn.price - (txn.fee ?? 0);
         const avg = h.quantity > 0 ? h.totalCost / h.quantity : 0;
         h.quantity -= txn.quantity; h.totalCost -= txn.quantity * avg;
       }
@@ -190,7 +187,7 @@ export async function GET(req: NextRequest) {
     await db.insert(dailySnapshots).values({
       id, date: today, accountId: acc.id,
       totalCost: Math.round(totalCost * 100) / 100,
-      totalMarketValue: Math.round((totalMarketValue + cashBalance) * 100) / 100,
+      totalMarketValue: Math.round(totalMarketValue * 100) / 100,
       currency: acc.currency,
       rates: JSON.stringify(ratesSnapshot),
       createdAt: new Date().toISOString(),
