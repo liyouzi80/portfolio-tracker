@@ -230,7 +230,7 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
                 {a.cashBalance !== undefined && a.cashBalance !== 0 && (
                   <div className="text-[10px] font-mono text-zinc-500 mt-0.5">
                     现金 {currencySymbols[a.currency] ?? a.currency + " "}{a.cashBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                    {a.cashBalance < 0 && <span className="text-amber-400 ml-1">（建议补录入金）</span>}
+                    {a.cashBalance < 0 && <span className="text-amber-400 ml-1">（含融资借入）</span>}
                   </div>
                 )}
                 <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-white/[0.005] rounded-full blur-md group-hover:bg-white/[0.02] transition-colors duration-500" />
