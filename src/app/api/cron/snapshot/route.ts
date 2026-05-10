@@ -23,6 +23,21 @@ export async function GET(req: NextRequest) {
   if (!migrationsRun) {
     try { await d1.prepare("ALTER TABLE daily_snapshots ADD COLUMN rates TEXT").run(); } catch { /* exists */ }
     try { await d1.prepare("CREATE TABLE IF NOT EXISTS cron_runs (id TEXT PRIMARY KEY, trigger_type TEXT NOT NULL, status TEXT NOT NULL, succeeded INTEGER DEFAULT 0, failed INTEGER DEFAULT 0, duration_ms INTEGER DEFAULT 0, error_message TEXT, started_at TEXT NOT NULL)").run(); } catch { /* exists */ }
+
+    // Remove NOT NULL from asset_id (SQLite requires table rebuild)
+    try {
+      const tableInfo = await d1.prepare("PRAGMA table_info(transactions)").all<{ name: string; notnull: number }>();
+      const assetIdCol = tableInfo.results?.find(c => c.name === "asset_id");
+      if (assetIdCol && assetIdCol.notnull === 1) {
+        await d1.batch([
+          d1.prepare("CREATE TABLE transactions_new (id TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES accounts(id), asset_id TEXT REFERENCES assets(id), type TEXT NOT NULL, quantity REAL NOT NULL, price REAL NOT NULL, fee REAL DEFAULT 0, date TEXT NOT NULL, notes TEXT, tx_hash TEXT, created_at TEXT NOT NULL)"),
+          d1.prepare("INSERT INTO transactions_new SELECT * FROM transactions"),
+          d1.prepare("DROP TABLE transactions"),
+          d1.prepare("ALTER TABLE transactions_new RENAME TO transactions"),
+        ]);
+      }
+    } catch { /* migration already done or table structure differs */ }
+
     migrationsRun = true;
   }
 

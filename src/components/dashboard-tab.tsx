@@ -149,9 +149,12 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
   const partialPrices = withPrev < totalHold;
 
   // Detect if all markets are closed (price unchanged from prevClose)
+  // Use percentage diff: tolerance covers data-source precision differences
+  // while avoiding misclassifying real intraday movement as "closed".
   const allMarketsClosedOrStale = data.holdings.length > 0 && data.holdings.every(h => {
     if (!h.currentPrice || !h.prevClose) return true;
-    return Math.abs(h.currentPrice - h.prevClose) < 0.001;
+    const pctDiff = Math.abs(h.currentPrice - h.prevClose) / h.prevClose;
+    return pctDiff < 0.0001;
   });
 
   const allocationMap = new Map<string, number>();
