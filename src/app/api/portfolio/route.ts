@@ -308,23 +308,26 @@ export async function GET(req: NextRequest) {
         if (d1Row?.price && d1Row.price > 0) cp = d1Row.price;
       }
 
-      // Always propagate priceUpdatedAt so frontend can show stale warnings
-      if (cached?.updatedAt) {
-        h.priceUpdatedAt = cached.updatedAt;
+      // Always propagate priceUpdatedAt so frontend can show stale warnings.
+      // Use D1 original timestamp (before live fetch) to reflect when prices
+      // were actually fetched, not when this portfolio request ran.
+      const d1Row = d1PriceMap.get(h.assetId);
+      const originalUpdatedAt = d1Row?.updatedAt ?? cached?.updatedAt;
+      if (originalUpdatedAt) {
+        h.priceUpdatedAt = originalUpdatedAt;
       }
 
       const rate = getRate(h.currency, baseCurrency);
-      // Skip if cross-currency rate is unavailable (e.g. rates-fetch never ran
-      // for this currency pair). A 0 rate would silently zero out the holding.
       const rateMissing = rate === 0 && h.currency !== baseCurrency;
-      const isPriceStale = cached?.updatedAt && (Date.now() - cached.updatedAt > STALE_MS);
+      const isPriceStale = originalUpdatedAt && (Date.now() - originalUpdatedAt > STALE_MS);
+      const isPriceFromToday = originalUpdatedAt && new Date(originalUpdatedAt).toDateString() === new Date().toDateString();
       if (cp && cp > 0 && !rateMissing && !isPriceStale) {
         h.currentPrice = cp;
         h.pnl = Math.round((cp - h.avgCost) * h.quantity * 100) / 100;
         h.pnlPct = h.avgCost > 0 ? Math.round((cp - h.avgCost) / h.avgCost * 10000) / 100 : 0;
         h.pnlInBase = Math.round((cp - h.avgCost) * h.quantity * rate * 100) / 100;
         h.marketValueInBase = Math.round(cp * h.quantity * rate * 100) / 100;
-        if (pc && pc > 0) {
+        if (pc && pc > 0 && isPriceFromToday) {
           h.prevClose = pc;
           h.todayPnl = Math.round((cp - pc) * h.quantity * 100) / 100;
           h.todayPnlInBase = Math.round((cp - pc) * h.quantity * rate * 100) / 100;
