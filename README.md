@@ -9,7 +9,7 @@
 ## 它能做什么
 
 **多市场行情**
-美股、港股、A股、日股、韩股、英德法荷西意瑞加澳台印 —— 任何 Yahoo Finance 能查到代码的标的都能跟。优先级回退链：腾讯财经（A股、港股）→ 长桥（港股优先源，可选）→ Finnhub（美股，可选）→ Yahoo Finance（兜底，全市场）。
+美股、港股、A股、日股、韩股、英德法荷西意瑞加澳台印 —— 任何 Yahoo Finance 能查到代码的标的都能跟。优先级回退链：腾讯财经（A股、港股）→ 长桥（港股优先源，可选）→ Finnhub（美股，可选，失败自动 fallback Yahoo）→ Yahoo Finance（兜底，全市场）。
 
 **真正算对的多币种盈亏**
 持仓在持仓币种、账户在账户币种、组合总览按你选定的 base currency 折算。汇率每日自动更新，**写入 daily snapshot 时同步保存当日汇率**——半年后回看历史净值不会被汇率波动污染。
@@ -18,13 +18,28 @@
 区分**交易盈亏**（卖出价差）和**股息收入**——这两类的稳定性完全不同，合并显示等于看个寂寞。
 
 **净值曲线 + 盈亏走势 + 持仓配置饼图**
-不是基于"累计买入金额"的伪净值——是基于每日真实 mark-to-market 的 daily snapshot。前端用 TradingView Lightweight Charts 渲染。
+不是基于"累计买入金额"的伪净值——是基于每日真实 mark-to-market 的 daily snapshot。前端用 TradingView Lightweight Charts 渲染，鼠标悬停显示日期与数值 tooltip。
+
+**行情状态可观测**
+header 常驻显示行情更新时间与标的覆盖率（如"14:32 · 已更新 20/23"）。超过 1 小时未更新变黄，超过 4 小时变红。点击未更新数字可看到缺失的标的列表。持仓表中超过 7 天未获取到价格的标的显示红色叹号警告。
+
+**手动刷新行情**
+header 刷新按钮一键触发全量价格抓取（60 秒节流），不用等 30 分钟 cron 周期。
+
+**休市判定**
+所有市场收盘后（所有持仓的当前价与前收盘价一致），今日盈亏自动显示"休市"而不是 0。
 
 **价格提醒**
 设阈值，cron 每 30 分钟检查一次（Cloudflare Workers Cron Triggers 内部触发），触发后浏览器弹通知。前端 settings 区显示已触发态，未读数量在 tab 上显示橙色徽标。
 
+**交易记录**
+支持买入、卖出、股息、入金、出金五种交易类型。入金/出金仅作为流水记录，不参与持仓市值或盈亏计算。每条交易支持一键复制（预填字段，日期自动改为今天），方便频繁交易场景。
+
 **导入与备份**
-CSV / Excel 批量导入交易记录，支持中英文表头、自动识别 A 股代码和港股代码、按 (symbol + market) 唯一去重。一键导出全部数据成 CSV 备份（含交易、账户、资产、快照、汇率、提醒）。
+CSV / Excel 批量导入交易记录，支持中英文表头、自动识别 A 股代码和港股代码、按 (symbol + market) 唯一去重。支持"清空账户后导入"模式用于完整数据替换。一键导出全部数据成 CSV 备份（含交易、账户、资产、快照、汇率、提醒）。
+
+**Cron 运行历史**
+设置页底部展示最近 10 次 cron 运行记录（价格抓取/快照/汇率），含状态、成功/失败数、耗时，方便排查调度问题。
 
 **端到端安全**
 - WebAuthn Passkey + PRF 扩展实现免密登录（Touch ID / Face ID / Windows Hello）
@@ -34,8 +49,10 @@ CSV / Excel 批量导入交易记录，支持中英文表头、自动识别 A �
 
 **灾备容错**
 - 价格缓存在 D1 `assets.last_price`，cron 每 30 分钟刷新；缺失时实时拉取行情源
+- 超过 7 天未更新的价格视为 stale，不参与市值计算（避免过期数据误导）
 - 缺汇率时跳过该持仓而不是归零
-- 行情源失败时按链路降级，不让单个 API 故障搞垮整个 dashboard
+- 行情源失败时按链路降级（含美股 Finnhub → Yahoo 自动 fallback），不让单个 API 故障搞垮整个 dashboard
+- daily snapshot 仅在持仓市值 > 0 时写入，避免行情源全挂时落入空数据
 
 ---
 
@@ -103,7 +120,7 @@ wrangler d1 create portfolio-db
 | `LONGBRIDGE_APP_SECRET` | 可选 | 同上 |
 | `LONGBRIDGE_ACCESS_TOKEN` | 可选 | 同上 |
 
-**关于行情源**：什么都不配也能跑——会全部走 Yahoo Finance + 腾讯财经免费源。配 Finnhub 后美股有更稳定的源 + 含 prevClose（影响"今日盈亏"计算）。配长桥后港股优先走它，速度更快。
+**关于行情源**：什么都不配也能跑——会全部走 Yahoo Finance + 腾讯财经免费源。配 Finnhub 后美股有更稳定的源 + 含 prevClose（影响"今日盈亏"计算），Finnhub 失败时自动 fallback 到 Yahoo。配长桥后港股优先走它，速度更快。
 
 ---
 
@@ -136,7 +153,7 @@ git push origin master
 
 仓库 → Actions → Cron Jobs (Manual Only) → Run workflow → job 选 `all` → Run。
 
-> **注意**：手动 workflow 走公网 CDN curl，可能被 Cloudflare Bot Fight Mode 拦（403）。如果失败，等下一轮 Workers Cron Triggers 自动执行即可，无需手动干预。
+> **注意**：手动 workflow 走公网 CDN curl，可能被 Cloudflare Bot Fight Mode 拦（403）。如果失败，等下一轮 Workers Cron Triggers 自动执行即可，无需手动干预。也可以在 dashboard header 点刷新按钮手动触发行情抓取。
 
 之后 Workers Cron Triggers 会按以下时间表自动在 Cloudflare 内部触发（不经过公网 CDN，无 403 问题）：
 
@@ -163,11 +180,12 @@ npx wrangler dev   # 含 D1 的完整本地环境（更接近生产）
 | 表 | 说明 |
 |---|---|
 | `accounts` | 账户：名称、币种、杠杆系数 |
-| `assets` | 标的：代码、市场、币种、`last_price` 容灾兜底 |
-| `transactions` | 交易：买/卖/分红，含 `tx_hash` 防重复导入 |
+| `assets` | 标的：代码、市场、币种、`last_price` / `last_prev_close` 容灾兜底 |
+| `transactions` | 交易：买/卖/分红/入金/出金，含 `tx_hash` 防重复导入 |
 | `alerts` | 价格提醒：阈值、启用状态、`triggered_at` |
 | `daily_snapshots` | 每日组合快照：成本、市值、当日汇率 JSON |
 | `exchange_rates` | 货币两两汇率（每天 06:30 UTC 更新） |
+| `cron_runs` | Cron 运行历史：任务类型、状态、成功/失败数、耗时 |
 | `auth` | 主密码哈希、Passkey PRF 哈希、配置 |
 
 ---
@@ -178,7 +196,7 @@ npx wrangler dev   # 含 D1 的完整本地环境（更接近生产）
 |---|---|---|
 | A 股 | 腾讯财经 | Yahoo Finance |
 | 港股 | 长桥（如配置）→ 腾讯财经 | Yahoo Finance |
-| 美股 | Finnhub（如配置） | Yahoo Finance |
+| 美股 | Finnhub（如配置）| Yahoo Finance（自动 fallback） |
 | 日韩英德法荷西意瑞加澳台印 | Yahoo Finance | — |
 
 腾讯财经美股端点会被 Cloudflare Workers 出口拦截，所以美股不走腾讯。其他市场通过 Yahoo Finance 后缀（`.T`/`.HK`/`.SS` 等）覆盖。
@@ -210,13 +228,19 @@ npx wrangler dev   # 含 D1 的完整本地环境（更接近生产）
 ## 常见问题
 
 **部署后日股 / 韩股 / 欧股价格不显示**
-等下一次 Workers Cron Trigger 跑完 `price-fetch`（每 30 分钟一次），D1 `assets.last_price` 会被填充。或去 Cloudflare Dashboard → Workers → portfolio-tracker → Logs 确认 cron 是否已触发。
+等下一次 Workers Cron Trigger 跑完 `price-fetch`（每 30 分钟一次），D1 `assets.last_price` 会被填充。或点 header 刷新按钮手动触发。也可去 Cloudflare Dashboard → Workers → portfolio-tracker → Logs 确认 cron 是否已触发。
 
 **净值曲线 / 盈亏走势是空白的**
 需要至少一天的 daily snapshot 数据。第一次部署后手动 Run workflow → snapshot 立即拍一次，之后每天 08:00 UTC 自动累积。
 
+**今日盈亏卡显示"休市"**
+所有持仓的当前价与前收盘价一致时显示"休市"——通常在所有市场收盘后出现，这是正常行为。
+
 **今日盈亏卡显示"等待行情数据"**
-没有持仓的 `prevClose` 字段。原因可能是：(1) D1 价格还没更新（手动跑一次 price-fetch），(2) 行情源没返回 prevClose（部分行情源对部分市场不返回，这是正常的，会随源切换自动恢复）。
+没有持仓的 `prevClose` 字段。原因可能是：(1) D1 价格还没更新（点刷新按钮或等下一次 cron），(2) 行情源没返回 prevClose（部分行情源对部分市场不返回，这是正常的，会随源切换自动恢复）。
+
+**持仓表某些标的出现红色叹号**
+该标的超过 7 天未获取到价格更新。可能原因：行情源不覆盖该代码、代码已退市、或 API key 配额耗尽。点 header 刷新按钮尝试重新抓取，或检查设置页底部的 Cron 运行历史确认抓取是否有报错。
 
 **部署后 API 返回 500 / Internal Server Error**
 - 检查 `wrangler.toml` 的 `database_id` 是否正确
@@ -239,11 +263,14 @@ src/
 │   │   ├── accounts/      # 账户 CRUD（含级联删除）
 │   │   ├── transactions/  # 交易 CRUD + CSV 导入
 │   │   ├── portfolio/     # 组合总览（最复杂的一个，含盈亏计算）
+│   │   ├── quotes/        # 轻量价格查询（跑马灯专用）
+│   │   ├── refresh/       # 手动刷新行情（60 秒节流）
 │   │   ├── price/         # 单个标的价格查询
 │   │   ├── search/        # Yahoo + 本地资产联合搜索
 │   │   ├── alerts/        # 价格提醒 CRUD
 │   │   ├── rates/         # 汇率查询
 │   │   ├── export/        # 全量数据 CSV 导出
+│   │   ├── cron-runs/     # Cron 运行历史查询
 │   │   ├── bg/            # Bing 每日壁纸（登录页）
 │   │   └── cron/          # 调度任务（price-fetch / snapshot / rates-fetch）
 │   ├── layout.tsx
@@ -254,7 +281,8 @@ src/
 │   ├── auth.ts            # PBKDF2 + JWT
 │   ├── price.ts           # 4 个行情源的统一封装
 │   ├── format.ts          # 财务级格式化
-│   └── stock-names.ts     # 美股代码 → 中文名映射
+│   ├── notifications.ts   # 浏览器通知
+│   └── stock-names.ts     # 美股/日股代码 → 中文名映射
 ├── middleware.ts          # API 路径鉴权
 └── types/
     └── cloudflare.d.ts    # D1 类型补丁
