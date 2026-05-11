@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db";
-import { alerts, assets } from "@/db/schema";
+import { assets } from "@/db/schema";
 import { getPlatformEnv } from "@/lib/env";
 import { fetchTencentPrices, fetchLongbridgePrices, fetchFinnhubPrice, fetchYahooQuote } from "@/lib/price";
 import { getChineseName } from "@/lib/stock-names";
-import { eq } from "drizzle-orm";
 import { cuid } from "@/lib/cuid";
 
 let migrationsRun = false;
@@ -131,22 +130,6 @@ export async function GET(req: NextRequest) {
     }
 
     results.push({ symbol: asset.symbol, market: asset.market, price, source });
-
-    // Check alerts
-    try {
-      const assetAlerts = await db.select().from(alerts).where(eq(alerts.assetId, asset.id)).all();
-      for (const alert of assetAlerts) {
-        if (!alert.enabled) continue;
-        let triggered = false;
-        if (alert.conditionType === "price_above" && price > alert.threshold) triggered = true;
-        if (alert.conditionType === "price_below" && price < alert.threshold) triggered = true;
-        if (triggered) {
-          pendingWrites.push(
-            db.update(alerts).set({ triggeredAt: new Date().toISOString(), enabled: 0 }).where(eq(alerts.id, alert.id)).run().catch(() => {})
-          );
-        }
-      }
-    } catch { /* alert check non-critical */ }
   }
 
   await Promise.all(pendingWrites);

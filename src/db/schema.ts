@@ -41,17 +41,6 @@ export const transactions = sqliteTable("transactions", {
   createdAt: text("created_at").notNull(),
 });
 
-export const alerts = sqliteTable("alerts", {
-  id: text("id").primaryKey(),
-  assetId: text("asset_id")
-    .notNull()
-    .references(() => assets.id),
-  conditionType: text("condition_type").notNull(), // price_above, price_below, change_pct
-  threshold: real("threshold").notNull(),
-  enabled: integer("enabled").default(1),
-  triggeredAt: text("triggered_at"),
-});
-
 export const dailySnapshots = sqliteTable("daily_snapshots", {
   id: text("id").primaryKey(),
   date: text("date").notNull(), // ISO date YYYY-MM-DD

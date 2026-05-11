@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AccountSheet } from "./account-sheet";
-import { AlertSheet } from "./alert-sheet";
 import { Plus, Pencil, Trash2, Zap, Fingerprint, Loader2, Download } from "lucide-react";
 import { toast } from "sonner";
 
@@ -48,13 +47,10 @@ async function registerPasskey(): Promise<string> {
 }
 
 interface Account { id: string; name: string; currency: string; leverage: number }
-interface Alert { id: string; symbol: string; condition: string; threshold: number; enabled: boolean; triggeredAt: string | null }
 
 export function SettingsTab() {
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [accountOpen, setAccountOpen] = useState(false);
-  const [alertOpen, setAlertOpen] = useState(false);
   const [editAccount, setEditAccount] = useState<Account | null>(null);
   const [dataSource, setDataSource] = useState("tencent");
   const [testing, setTesting] = useState(false);
@@ -67,25 +63,13 @@ export function SettingsTab() {
 
   const loadData = useCallback(async () => {
     try {
-      const [accRes, alertRes, authRes] = await Promise.all([
+      const [accRes, authRes] = await Promise.all([
         fetch("/api/accounts"),
-        fetch("/api/alerts"),
         fetch("/api/auth"),
       ]);
       if (accRes.ok) {
         const accData = await accRes.json() as Array<{ id: string; name: string; currency: string; leverage: number }>;
         setAccounts(accData);
-      }
-      if (alertRes.ok) {
-        const alertData = await alertRes.json() as Array<{ id: string; symbol: string; conditionType: string; threshold: number; enabled: number; triggeredAt: string | null }>;
-        setAlerts(alertData.map((a) => ({
-          id: a.id,
-          symbol: a.symbol,
-          condition: a.conditionType,
-          threshold: a.threshold,
-          enabled: a.enabled === 1,
-          triggeredAt: a.triggeredAt ?? null,
-        })));
       }
       if (authRes.ok) {
         const authData = await authRes.json() as { hasPasskey?: boolean; dataSource?: string };
@@ -152,61 +136,6 @@ export function SettingsTab() {
       if (data.success) { toast.success("账户已删除"); }
       else { setAccounts(prev); toast.error(data.error || "删除失败"); }
     } catch { setAccounts(prev); toast.error("操作失败，请重试"); }
-  };
-
-  const handleAddAlert = async (a: { symbol: string; condition: string; threshold: number }) => {
-    try {
-      const market = /^\d{4,6}$/.test(a.symbol) ? (/^6/.test(a.symbol) ? "CN" : "HK") : "US";
-      const res = await fetch("/api/alerts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ symbol: a.symbol, market, conditionType: a.condition, threshold: a.threshold }),
-      });
-      const data = await res.json() as { id?: string; error?: string };
-      if (data.id) {
-        setAlerts([...alerts, { id: data.id, ...a, enabled: true, triggeredAt: null }]);
-        toast.success("提醒已创建");
-      } else {
-        toast.error(data.error || "创建失败");
-      }
-    } catch { toast.error("操作失败，请重试"); }
-  };
-
-  const handleDeleteAlert = async (id: string) => {
-    try {
-      await fetch(`/api/alerts?id=${id}`, { method: "DELETE" });
-      setAlerts(alerts.filter((a) => a.id !== id));
-      toast.success("提醒已删除");
-    } catch { toast.error("操作失败，请重试"); }
-  };
-
-  const handleToggleAlert = async (id: string) => {
-    const a = alerts.find((x) => x.id === id);
-    if (!a) return;
-    const newEnabled = !a.enabled;
-    setAlerts(alerts.map((x) => x.id === id ? { ...x, enabled: newEnabled } : x));
-    try {
-      await fetch("/api/alerts", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, action: "toggle", enabled: newEnabled }),
-      });
-    } catch {
-      setAlerts(alerts.map((x) => x.id === id ? { ...x, enabled: !newEnabled } : x));
-      toast.error("更新失败");
-    }
-  };
-
-  const handleResetAlert = async (id: string) => {
-    setAlerts(alerts.map((x) => x.id === id ? { ...x, triggeredAt: null, enabled: true } : x));
-    try {
-      await fetch("/api/alerts", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, action: "reset" }),
-      });
-      toast.success("提醒已重置");
-    } catch { toast.error("重置失败"); loadData(); }
   };
 
   const handleRegisterPasskey = async () => {
@@ -317,64 +246,6 @@ export function SettingsTab() {
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table></div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Alerts */}
-      <Card className="t-tab-content t-card border-white/[0.06] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium text-zinc-100">价格提醒</CardTitle>
-            <Button size="sm" variant="outline" className="border-zinc-700 text-zinc-300" onClick={() => setAlertOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" />添加
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {alerts.length === 0 ? (
-            <p className="text-zinc-500 text-sm text-center py-8">暂无提醒，点击"添加"创建</p>
-          ) : (
-            <div className="overflow-x-auto"><Table>
-              <TableHeader>
-                <TableRow className="border-zinc-800 ">
-                  <TableHead className="text-zinc-500">代码</TableHead>
-                  <TableHead className="text-zinc-500">条件</TableHead>
-                  <TableHead className="text-zinc-500">阈值</TableHead>
-                  <TableHead className="text-zinc-500">状态</TableHead>
-                  <TableHead className="text-zinc-500 w-20" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {alerts.map((a) => (
-                  <TableRow key={a.id} className="border-zinc-800">
-                    <TableCell className="font-mono font-medium text-zinc-100">{a.symbol}</TableCell>
-                    <TableCell className="text-zinc-300">{a.condition === "price_below" ? "低于" : "高于"}</TableCell>
-                    <TableCell className="font-mono text-zinc-100">{a.threshold}</TableCell>
-                    <TableCell>
-                      {a.triggeredAt ? (
-                        <button onClick={() => handleResetAlert(a.id)} title={`触发于 ${new Date(a.triggeredAt).toLocaleString()}`}>
-                          <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/20 cursor-pointer hover:bg-amber-500/20">
-                            已触发
-                          </Badge>
-                        </button>
-                      ) : (
-                        <button onClick={() => handleToggleAlert(a.id)}>
-                          <Badge variant="outline" className={a.enabled ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 cursor-pointer" : "bg-zinc-800 text-zinc-500 border-zinc-700 cursor-pointer"}>
-                            {a.enabled ? "启用" : "暂停"}
-                          </Badge>
-                        </button>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-500 hover:text-red-400" onClick={() => handleDeleteAlert(a.id)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -538,7 +409,6 @@ export function SettingsTab() {
       </Card>
 
       <AccountSheet open={accountOpen} onOpenChange={setAccountOpen} onSave={handleSaveAccount} editAccount={editAccount} />
-      <AlertSheet open={alertOpen} onOpenChange={setAlertOpen} onSave={handleAddAlert} />
       </>
       )}
     </div>
