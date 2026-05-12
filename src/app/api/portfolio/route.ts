@@ -38,6 +38,7 @@ interface AccountSummary {
   tradingPnl?: number;
   dividendIncome?: number;
   unrealizedPnl?: number;
+  todayPnl?: number;
   holdings: Holding[];
 }
 
@@ -369,6 +370,11 @@ export async function GET(req: NextRequest) {
     // Unrealized P&L only for priced holdings (matched cost vs market value)
     const unrealizedPnl = accountMarketValue - pricedCost;
     const totalPnl = unrealizedPnl + realizedPnl;
+    const accountTodayPnl = holdings.reduce((sum, h) => {
+      if (h.todayPnl === undefined) return sum;
+      const r = getRate(h.currency, acc.currency);
+      return sum + h.todayPnl * (r || 1);
+    }, 0);
     accountSummaries.push({
       id: acc.id,
       name: acc.name,
@@ -381,6 +387,7 @@ export async function GET(req: NextRequest) {
       tradingPnl: Math.round(tradingPnl * 100) / 100,
       dividendIncome: Math.round(dividendIncome * 100) / 100,
       unrealizedPnl: Math.round(unrealizedPnl * 100) / 100,
+      todayPnl: Math.round(accountTodayPnl * 100) / 100,
       holdings,
     });
   }

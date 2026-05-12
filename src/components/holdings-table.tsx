@@ -18,6 +18,7 @@ interface Holding {
   prevClose?: number;
   pnl?: number;
   pnlPct?: number;
+  todayPnl?: number;
   priceUpdatedAt?: number;
 }
 
@@ -70,6 +71,7 @@ export function HoldingsTable({ data, onSymbolClick }: { data: Holding[]; onSymb
           <TableHead className="text-zinc-400 text-right">现价</TableHead>
           <TableHead className="text-zinc-400 text-right">成本</TableHead>
           <TableHead className="text-zinc-400 text-right">盈亏</TableHead>
+          <TableHead className="text-right text-zinc-500">今日</TableHead>
           <TableHead className="text-zinc-400 w-8" />
         </TableRow>
       </TableHeader>
@@ -127,6 +129,15 @@ export function HoldingsTable({ data, onSymbolClick }: { data: Holding[]; onSymb
             }`}>
               {h.pnl !== undefined ? `${h.currency} ${fmtMoneySigned(h.pnl)}` : "--"}
               {h.pnlPct !== undefined && <span className="text-xs ml-1">({fmtPercent(h.pnlPct)})</span>}
+            </TableCell>
+            <TableCell className="text-right font-mono tabular-nums">
+              {h.todayPnl !== undefined && h.todayPnl !== 0 ? (
+                <span className={h.todayPnl > 0 ? "text-emerald-400" : "text-red-400"}>
+                  {h.todayPnl > 0 ? "+" : ""}{h.todayPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              ) : (
+                <span className="text-zinc-500">--</span>
+              )}
             </TableCell>
             <TableCell>
               <a

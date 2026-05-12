@@ -8,6 +8,7 @@ import { ProfitCurve } from "./profit-curve";
 import { DashboardSkeleton } from "./loading-skeleton";
 import { EmptyState } from "./empty-state";
 import { Plus, TrendingUp, TrendingDown, Wallet, PiggyBank, Layers } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Holding {
   assetId: string; symbol: string; name: string; market: string; currency: string;
@@ -20,6 +21,7 @@ interface ChartPoint { date: string; value: number; }
 interface AccountSummary {
   id: string; name: string; currency: string; leverage?: number; totalCost: number;
   totalMarketValue?: number; totalPnl?: number; realizedPnl?: number; tradingPnl?: number; dividendIncome?: number; unrealizedPnl?: number;
+  todayPnl?: number;
   holdings: Holding[];
 }
 interface PortfolioData {
@@ -87,6 +89,7 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
   const [data, setData] = useState<PortfolioData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [detailAccount, setDetailAccount] = useState<AccountSummary | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -201,8 +204,9 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
             return (
               <div key={a.id}
                 className="relative overflow-hidden rounded-xl border border-white/[0.05] bg-white/[0.01] px-4 py-3
-                  hover:border-white/[0.08] hover:bg-white/[0.02] transition-all duration-300 group cursor-default"
+                  hover:border-white/[0.08] hover:bg-white/[0.02] transition-all duration-300 group cursor-pointer"
                 style={{ animationDelay: `${(i + 1) * 50}ms` }}
+                onClick={() => setDetailAccount(a)}
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[12px] font-medium text-zinc-400">{a.name}</span>
@@ -214,6 +218,11 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
                 <div className={`text-[11px] font-mono mt-1 ${pnlSentiment}`}>
                   {fmtMoney(pnl, currencySymbols[a.currency] ?? "")}
                 </div>
+                {a.todayPnl !== undefined && a.todayPnl !== 0 && !allMarketsClosedOrStale && (
+                  <div className={`text-[11px] font-mono mt-0.5 ${a.todayPnl > 0 ? "text-emerald-400" : "text-red-400"}`}>
+                    今日 {a.todayPnl > 0 ? "+" : ""}{currencySymbols[a.currency] ?? ""}{Math.abs(a.todayPnl).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  </div>
+                )}
                 {a.totalCost > 0 && (
                   <div className={`text-[10px] font-mono mt-0.5 ${
                     a.leverage && ((a.totalMarketValue ?? a.totalCost) / a.totalCost) > a.leverage ? "text-red-400" : "text-zinc-500"
@@ -289,6 +298,36 @@ export function DashboardTab({ visible, onAddTransaction }: { visible: boolean; 
           <HoldingsTable data={data.holdings} onSymbolClick={() => onAddTransaction?.()} />
         </div>
       </div>
+
+      {/* ── Today P&L Detail Dialog ──────────────────────── */}
+      {detailAccount && (
+        <Dialog open={!!detailAccount} onOpenChange={(v) => !v && setDetailAccount(null)}>
+          <DialogContent className="bg-zinc-900 border-zinc-800 max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-zinc-100">{detailAccount.name} · 今日盈亏明细</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-1 max-h-[60vh] overflow-auto">
+              {detailAccount.holdings
+                .filter(h => h.todayPnl !== undefined && h.todayPnl !== 0)
+                .sort((a, b) => Math.abs(b.todayPnl ?? 0) - Math.abs(a.todayPnl ?? 0))
+                .map(h => (
+                  <div key={h.symbol + h.market} className="flex justify-between items-center py-1.5 px-2 rounded hover:bg-zinc-800/50">
+                    <div>
+                      <span className="font-mono text-sm text-zinc-100">{h.symbol}</span>
+                      <span className="text-xs text-zinc-500 ml-1.5">{h.name}</span>
+                    </div>
+                    <span className={`font-mono text-sm ${(h.todayPnl ?? 0) > 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {(h.todayPnl ?? 0) > 0 ? "+" : ""}{(h.todayPnl ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                ))}
+              {detailAccount.holdings.filter(h => h.todayPnl !== undefined && h.todayPnl !== 0).length === 0 && (
+                <p className="text-zinc-500 text-sm text-center py-4">暂无今日盈亏数据</p>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* ── Attribution (license requirement) ────────────── */}
       <p className="text-center text-[10px] text-zinc-600 pb-2">
