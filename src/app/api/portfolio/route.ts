@@ -209,16 +209,15 @@ export async function GET(req: NextRequest) {
     if (missingPrices.length > 0) {
       const assetIdByKey = new Map(missingPrices.map(p => [`${p.market}:${p.symbol}`, p.assetId]));
       const d1Updates: Promise<unknown>[] = [];
-      const updateD1 = (market: string, symbol: string, price: number, prevClose?: number) => {
+      const updateD1 = (market: string, symbol: string, price: number, _prevClose?: number) => {
         const assetId = assetIdByKey.get(`${market}:${symbol}`);
         if (assetId) {
-          const oldPrice = d1PriceMap.get(assetId)?.price ?? null;
-          const newPrevClose = (oldPrice !== null && Math.abs(oldPrice - price) > 0.001)
-            ? oldPrice
-            : d1PriceMap.get(assetId)?.prevClose ?? prevClose;
+          const oldPrice: number | null = d1PriceMap.get(assetId)?.price ?? null;
+          const priceChanged = oldPrice === null || Math.abs(price - oldPrice) > 0.001;
+          const newPrevClose = priceChanged && oldPrice ? oldPrice : (d1PriceMap.get(assetId)?.prevClose ?? null);
           d1Updates.push(
             d1.prepare("UPDATE assets SET last_price = ?, last_prev_close = ?, last_price_updated_at = ? WHERE id = ?")
-              .bind(price, newPrevClose ?? null, new Date().toISOString(), assetId).run().catch(() => {})
+              .bind(price, newPrevClose, new Date().toISOString(), assetId).run().catch(() => {})
           );
         }
       };

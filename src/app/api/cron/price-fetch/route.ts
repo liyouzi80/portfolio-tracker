@@ -114,24 +114,22 @@ export async function GET(req: NextRequest) {
 
     const { price, prevClose, name: displayName, source } = priceData;
 
-    const oldPrice = asset.lastPrice ?? null;
-    const newPrevClose = (oldPrice !== null && Math.abs(oldPrice - price) > 0.001)
-      ? oldPrice
-      : asset.lastPrevClose ?? prevClose;
+    const oldPrice: number | null = asset.lastPrice ?? null;
+    const priceChanged = oldPrice === null || Math.abs(price - oldPrice) > 0.001;
+    const newPrevClose = priceChanged && oldPrice ? oldPrice : (asset.lastPrevClose ?? null);
 
     const cnName = getChineseName(asset.symbol, asset.market);
-    const nameForCache = cnName || (displayName && displayName !== asset.symbol ? displayName : asset.symbol);
+    const nameForCache = cnName || displayName || asset.name || asset.symbol;
 
-    const bestName = cnName || (displayName && displayName !== asset.symbol ? displayName : null);
-    if (bestName && bestName !== asset.name) {
+    if (displayName && (!asset.name || asset.name === asset.symbol)) {
       pendingWrites.push(
         d1.prepare("UPDATE assets SET name = ?, last_price = ?, last_prev_close = ?, last_price_updated_at = ? WHERE id = ?")
-          .bind(bestName, price, newPrevClose ?? null, new Date().toISOString(), asset.id).run().catch(() => {})
+          .bind(nameForCache, price, newPrevClose, new Date().toISOString(), asset.id).run().catch(() => {})
       );
     } else {
       pendingWrites.push(
         d1.prepare("UPDATE assets SET last_price = ?, last_prev_close = ?, last_price_updated_at = ? WHERE id = ?")
-          .bind(price, newPrevClose ?? null, new Date().toISOString(), asset.id).run().catch(() => {})
+          .bind(price, newPrevClose, new Date().toISOString(), asset.id).run().catch(() => {})
       );
     }
 
