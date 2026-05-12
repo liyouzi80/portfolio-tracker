@@ -113,6 +113,12 @@ export async function GET(req: NextRequest) {
     }
 
     const { price, prevClose, name: displayName, source } = priceData;
+
+    const oldPrice = asset.lastPrice ?? null;
+    const newPrevClose = (oldPrice !== null && Math.abs(oldPrice - price) > 0.001)
+      ? oldPrice
+      : asset.lastPrevClose ?? prevClose;
+
     const cnName = getChineseName(asset.symbol, asset.market);
     const nameForCache = cnName || (displayName && displayName !== asset.symbol ? displayName : asset.symbol);
 
@@ -120,12 +126,12 @@ export async function GET(req: NextRequest) {
     if (bestName && bestName !== asset.name) {
       pendingWrites.push(
         d1.prepare("UPDATE assets SET name = ?, last_price = ?, last_prev_close = ?, last_price_updated_at = ? WHERE id = ?")
-          .bind(bestName, price, prevClose ?? null, new Date().toISOString(), asset.id).run().catch(() => {})
+          .bind(bestName, price, newPrevClose ?? null, new Date().toISOString(), asset.id).run().catch(() => {})
       );
     } else {
       pendingWrites.push(
         d1.prepare("UPDATE assets SET last_price = ?, last_prev_close = ?, last_price_updated_at = ? WHERE id = ?")
-          .bind(price, prevClose ?? null, new Date().toISOString(), asset.id).run().catch(() => {})
+          .bind(price, newPrevClose ?? null, new Date().toISOString(), asset.id).run().catch(() => {})
       );
     }
 

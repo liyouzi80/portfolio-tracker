@@ -212,9 +212,13 @@ export async function GET(req: NextRequest) {
       const updateD1 = (market: string, symbol: string, price: number, prevClose?: number) => {
         const assetId = assetIdByKey.get(`${market}:${symbol}`);
         if (assetId) {
+          const oldPrice = d1PriceMap.get(assetId)?.price ?? null;
+          const newPrevClose = (oldPrice !== null && Math.abs(oldPrice - price) > 0.001)
+            ? oldPrice
+            : d1PriceMap.get(assetId)?.prevClose ?? prevClose;
           d1Updates.push(
             d1.prepare("UPDATE assets SET last_price = ?, last_prev_close = ?, last_price_updated_at = ? WHERE id = ?")
-              .bind(price, prevClose ?? null, new Date().toISOString(), assetId).run().catch(() => {})
+              .bind(price, newPrevClose ?? null, new Date().toISOString(), assetId).run().catch(() => {})
           );
         }
       };
